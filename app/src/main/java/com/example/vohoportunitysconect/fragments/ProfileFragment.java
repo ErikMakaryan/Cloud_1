@@ -57,7 +57,6 @@ public class ProfileFragment extends Fragment {
         databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
         storageRef = FirebaseStorage.getInstance().getReference("profile_images");
 
-        // Handle image picking result
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -115,35 +114,39 @@ public class ProfileFragment extends Fragment {
             imagePickerLauncher.launch(intent);
         });
 
-        addHoursButton.setOnClickListener(v -> addVolunteerHours(1)); // Add 1 hour per click
+        addHoursButton.setOnClickListener(v -> addVolunteerHours(1));
     }
 
     private void loadUserData() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
-            DatabaseReference userRef = databaseRef.child("users").child(userId);
-            userRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    if (dataSnapshot.exists()) {
-                        nameText.setText(dataSnapshot.child("name").getValue(String.class));
-                        emailText.setText(dataSnapshot.child("email").getValue(String.class));
-                        hoursText.setText(String.valueOf(dataSnapshot.child("volunteer_hours").getValue(Long.class) != null ? dataSnapshot.child("volunteer_hours").getValue(Long.class) : 0));
-                        opportunitiesText.setText(String.valueOf(dataSnapshot.child("completed_projects").getValue(Long.class) != null ? dataSnapshot.child("completed_projects").getValue(Long.class) : 0));
-                        applicationsCount.setText(String.valueOf(dataSnapshot.child("applications").getValue(Long.class) != null ? dataSnapshot.child("applications").getValue(Long.class) : 0));
+            databaseRef.child("users").child(userId)
+                    .addValueEventListener(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                            if (dataSnapshot.exists()) {
+                                nameText.setText(dataSnapshot.child("name").getValue(String.class));
+                                emailText.setText(dataSnapshot.child("email").getValue(String.class));
+                                Long volunteerHours = dataSnapshot.child("volunteer_hours").getValue(Long.class);
+                                Long completedProjects = dataSnapshot.child("completed_projects").getValue(Long.class);
+                                Long applications = dataSnapshot.child("applications").getValue(Long.class);
 
-                        String imageUrl = dataSnapshot.child("profile_image").getValue(String.class);
-                        if (imageUrl != null) {
-                            Glide.with(ProfileFragment.this).load(imageUrl).into(profileImage);
+                                hoursText.setText(String.valueOf(volunteerHours != null ? volunteerHours : 0));
+                                opportunitiesText.setText(String.valueOf(completedProjects != null ? completedProjects : 0));
+                                applicationsCount.setText(String.valueOf(applications != null ? applications : 0));
+
+                                String imageUrl = dataSnapshot.child("profile_image").getValue(String.class);
+                                if (imageUrl != null) {
+                                    Glide.with(ProfileFragment.this).load(imageUrl).into(profileImage);
+                                }
+                            }
                         }
-                    }
-                }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Toast.makeText(getContext(), "Error loading user data", Toast.LENGTH_SHORT).show();
-                }
-            });
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError databaseError) {
+                            Toast.makeText(getContext(), "Error loading user data", Toast.LENGTH_SHORT).show();
+                        }
+                    });
         }
     }
 

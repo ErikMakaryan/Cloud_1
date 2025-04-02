@@ -57,7 +57,6 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_home, container, false);
         
-        // Initialize views
         welcomeText = root.findViewById(R.id.welcome_text);
         hoursText = root.findViewById(R.id.hours_text);
         projectsText = root.findViewById(R.id.projects_text);
@@ -66,16 +65,9 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
         viewAllOpportunitiesButton = root.findViewById(R.id.view_all_opportunities_button);
         viewAllActivityButton = root.findViewById(R.id.view_all_activity_button);
 
-        // Setup RecyclerViews
         setupRecyclerViews();
-        
-        // Setup button click listeners
         setupButtonListeners();
-
-        // Load user data
         loadUserData();
-        
-        // Load opportunities and activities
         loadFeaturedOpportunities();
         loadRecentActivity();
 
@@ -95,13 +87,11 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
     }
 
     private void setupRecyclerViews() {
-        // Featured opportunities
         featuredOpportunitiesRecycler.setLayoutManager(
             new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
         opportunityAdapter = new OpportunityAdapter(new ArrayList<>(), this);
         featuredOpportunitiesRecycler.setAdapter(opportunityAdapter);
 
-        // Recent activity
         recentActivityRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
         activityAdapter = new ActivityAdapter();
         recentActivityRecycler.setAdapter(activityAdapter);
@@ -118,7 +108,6 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
                             String name = dataSnapshot.child("name").getValue(String.class);
                             welcomeText.setText("Welcome back, " + name + "!");
                             
-                            // Update stats
                             Long hours = dataSnapshot.child("volunteer_hours").getValue(Long.class);
                             Long projects = dataSnapshot.child("completed_projects").getValue(Long.class);
                             
@@ -155,7 +144,6 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
                 }
                 opportunityAdapter.setOpportunities(opportunities);
                 
-                // Show/hide view all button based on opportunities count
                 viewAllOpportunitiesButton.setVisibility(
                     opportunities.isEmpty() ? View.GONE : View.VISIBLE);
             }
@@ -189,7 +177,6 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
                     }
                     activityAdapter.setActivities(activities);
                     
-                    // Show/hide view all button based on activities count
                     viewAllActivityButton.setVisibility(
                         activities.isEmpty() ? View.GONE : View.VISIBLE);
                 }
