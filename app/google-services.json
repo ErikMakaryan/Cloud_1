@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "490743356878",
+    "project_id": "vvoohh-e2b0a",
+    "storage_bucket": "vvoohh-e2b0a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:490743356878:android:a3f27a58e471a3a51d9f9f",
+        "android_client_info": {
+          "package_name": "com.example.vohoportunitysconect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB581wW737gDNSDq_bCa7iOJ0V6b29Pibo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

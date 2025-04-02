@@ -1,0 +1,121 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isOrganization() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'organization';
+    }
+    
+    function isVolunteer() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'volunteer';
+    }
+    
+    function isValidUserData() {
+      let data = request.resource.data;
+      return data.name is string && 
+             data.name.size() > 0 &&
+             data.email is string &&
+             data.email.matches('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$') &&
+             data.phoneNumber is string &&
+             data.phoneNumber.matches('^\\+?[1-9]\\d{1,14}$') &&
+             data.bio is string &&
+             data.bio.size() <= 500 &&
+             data.userType in ['organization', 'volunteer'];
+    }
+    
+    function isValidOpportunity() {
+      let data = request.resource.data;
+      return data.title is string &&
+             data.title.size() > 0 &&
+             data.description is string &&
+             data.description.size() > 0 &&
+             data.location is string &&
+             data.location.size() > 0 &&
+             data.skills is string &&
+             data.skills.size() > 0 &&
+             data.organizationId is string &&
+             data.organizationId.size() > 0 &&
+             data.organizationName is string &&
+             data.organizationName.size() > 0 &&
+             data.difficulty in ['easy', 'medium', 'hard'] &&
+             data.maxVolunteers > 0 &&
+             data.currentVolunteers >= 0 &&
+             data.currentVolunteers <= data.maxVolunteers &&
+             data.isActive is bool;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                   request.auth.uid == userId && 
+                   isValidUserData();
+      allow update: if isOwner(userId) && isValidUserData();
+      allow delete: if isOwner(userId);
+    }
+
+    // Opportunities collection
+    match /opportunities/{opportunityId} {
+      allow read: if isAuthenticated();
+      allow create: if isOrganization() && 
+                   isValidOpportunity() &&
+                   request.resource.data.organizationId == request.auth.uid;
+      allow update: if isOrganization() && 
+                   isValidOpportunity() &&
+                   resource.data.organizationId == request.auth.uid;
+      allow delete: if isOrganization() && 
+                   resource.data.organizationId == request.auth.uid;
+    }
+
+    // Applications collection
+    match /applications/{applicationId} {
+      allow read: if isAuthenticated() && 
+                 (resource.data.userId == request.auth.uid || 
+                  resource.data.organizationId == request.auth.uid);
+      allow create: if isVolunteer() && 
+                   request.resource.data.userId == request.auth.uid;
+      allow update: if isOrganization() && 
+                   resource.data.organizationId == request.auth.uid &&
+                   request.resource.data.status in ['pending', 'accepted', 'rejected'];
+      allow delete: if isVolunteer() && 
+                   resource.data.userId == request.auth.uid;
+    }
+
+    // Activities collection
+    match /activities/{activityId} {
+      allow read: if isAuthenticated() && 
+                 (resource.data.userId == request.auth.uid || 
+                  resource.data.organizationId == request.auth.uid);
+      allow create: if isVolunteer() && 
+                   request.resource.data.userId == request.auth.uid;
+      allow update: if isVolunteer() && 
+                   resource.data.userId == request.auth.uid;
+      allow delete: if isVolunteer() && 
+                   resource.data.userId == request.auth.uid;
+    }
+
+    // Certifications collection
+    match /certifications/{certificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isOrganization() && 
+                   request.resource.data.organizationId == request.auth.uid;
+      allow update: if isOrganization() && 
+                   resource.data.organizationId == request.auth.uid;
+      allow delete: if isOrganization() && 
+                   resource.data.organizationId == request.auth.uid;
+    }
+  }
+} 

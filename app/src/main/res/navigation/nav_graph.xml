@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_home">
+
+    <fragment
+        android:id="@+id/nav_home"
+        android:name="com.example.vohoportunitysconect.ui.home.HomeFragment"
+        android:label="Home" />
+
+    <fragment
+        android:id="@+id/nav_opportunities"
+        android:name="com.example.vohoportunitysconect.ui.opportunities.OpportunitiesFragment"
+        android:label="Opportunities" />
+
+    <fragment
+        android:id="@+id/nav_applications"
+        android:name="com.example.vohoportunitysconect.ui.applications.ApplicationsFragment"
+        android:label="My Applications" />
+
+    <fragment
+        android:id="@+id/nav_saved"
+        android:name="com.example.vohoportunitysconect.ui.saved.SavedFragment"
+        android:label="Saved" />
+
+    <fragment
+        android:id="@+id/nav_profile"
+        android:name="com.example.vohoportunitysconect.ui.profile.ProfileFragment"
+        android:label="Profile" />
+
+    <fragment
+        android:id="@+id/nav_opportunity_details"
+        android:name="com.example.vohoportunitysconect.ui.opportunities.OpportunityDetailsFragment"
+        android:label="Opportunity Details" />
+</navigation> 
