@@ -3,9 +3,10 @@ package com.example.vohoportunitysconect.models;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import com.google.firebase.firestore.Exclude;
-import com.google.firebase.firestore.PropertyName;
+import com.google.firebase.database.Exclude;
+import com.google.firebase.database.IgnoreExtraProperties;
 
+@IgnoreExtraProperties
 public class User {
     @Exclude
     private String id;

@@ -4,12 +4,12 @@ import android.util.Log;
 import com.example.vohoportunitysconect.models.User;
 import com.example.vohoportunitysconect.models.Opportunity;
 import com.example.vohoportunitysconect.models.UserActivity;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.Query;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,10 +18,10 @@ import java.util.Map;
 public class DatabaseManager {
     private static final String TAG = "DatabaseManager";
     private static DatabaseManager instance;
-    private final FirebaseFirestore db;
+    private final DatabaseReference databaseRef;
 
     private DatabaseManager() {
-        db = FirebaseFirestore.getInstance();
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
     }
 
     public static synchronized DatabaseManager getInstance() {
@@ -38,118 +38,158 @@ public class DatabaseManager {
 
     // User operations
     public void saveUser(User user, DatabaseCallback<Void> callback) {
-        db.collection("users").document(user.getId())
-                .set(user)
+        databaseRef.child("users").child(user.getId())
+                .setValue(user)
                 .addOnSuccessListener(aVoid -> callback.onSuccess(null))
                 .addOnFailureListener(callback::onError);
     }
 
     public void getUser(String userId, DatabaseCallback<User> callback) {
-        db.collection("users").document(userId)
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists()) {
-                        User user = documentSnapshot.toObject(User.class);
-                        callback.onSuccess(user);
-                    } else {
-                        callback.onError(new Exception("User not found"));
+        databaseRef.child("users").child(userId)
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        if (dataSnapshot.exists()) {
+                            User user = dataSnapshot.getValue(User.class);
+                            callback.onSuccess(user);
+                        } else {
+                            callback.onError(new Exception("User not found"));
+                        }
                     }
-                })
-                .addOnFailureListener(callback::onError);
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        callback.onError(new Exception(databaseError.getMessage()));
+                    }
+                });
     }
 
     // Opportunity operations
     public void saveOpportunity(Opportunity opportunity, DatabaseCallback<Void> callback) {
-        db.collection("opportunities").document(opportunity.getId())
-                .set(opportunity)
+        databaseRef.child("opportunities").child(opportunity.getId())
+                .setValue(opportunity)
                 .addOnSuccessListener(aVoid -> callback.onSuccess(null))
                 .addOnFailureListener(callback::onError);
     }
 
     public void getOpportunity(String opportunityId, DatabaseCallback<Opportunity> callback) {
-        db.collection("opportunities").document(opportunityId)
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists()) {
-                        Opportunity opportunity = documentSnapshot.toObject(Opportunity.class);
-                        callback.onSuccess(opportunity);
-                    } else {
-                        callback.onError(new Exception("Opportunity not found"));
+        databaseRef.child("opportunities").child(opportunityId)
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        if (dataSnapshot.exists()) {
+                            Opportunity opportunity = dataSnapshot.getValue(Opportunity.class);
+                            callback.onSuccess(opportunity);
+                        } else {
+                            callback.onError(new Exception("Opportunity not found"));
+                        }
                     }
-                })
-                .addOnFailureListener(callback::onError);
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        callback.onError(new Exception(databaseError.getMessage()));
+                    }
+                });
     }
 
     public void getAllOpportunities(DatabaseCallback<List<Opportunity>> callback) {
-        db.collection("opportunities")
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    List<Opportunity> opportunities = new ArrayList<>();
-                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                        Opportunity opportunity = document.toObject(Opportunity.class);
-                        opportunities.add(opportunity);
+        databaseRef.child("opportunities")
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        List<Opportunity> opportunities = new ArrayList<>();
+                        for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                            Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                            if (opportunity != null) {
+                                opportunity.setId(snapshot.getKey());
+                                opportunities.add(opportunity);
+                            }
+                        }
+                        callback.onSuccess(opportunities);
                     }
-                    callback.onSuccess(opportunities);
-                })
-                .addOnFailureListener(callback::onError);
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        callback.onError(new Exception(databaseError.getMessage()));
+                    }
+                });
     }
 
     // Activity operations
     public void saveActivity(UserActivity activity, DatabaseCallback<Void> callback) {
-        db.collection("activities").document(activity.getId())
-                .set(activity)
+        databaseRef.child("activities").child(activity.getId())
+                .setValue(activity)
                 .addOnSuccessListener(aVoid -> callback.onSuccess(null))
                 .addOnFailureListener(callback::onError);
     }
 
     public void getUserActivities(String userId, DatabaseCallback<List<UserActivity>> callback) {
-        db.collection("activities")
-                .whereEqualTo("userId", userId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    List<UserActivity> activities = new ArrayList<>();
-                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                        UserActivity activity = document.toObject(UserActivity.class);
+        Query activitiesQuery = databaseRef.child("activities")
+                .orderByChild("userId")
+                .equalTo(userId);
+
+        activitiesQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                List<UserActivity> activities = new ArrayList<>();
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    UserActivity activity = snapshot.getValue(UserActivity.class);
+                    if (activity != null) {
+                        activity.setId(snapshot.getKey());
                         activities.add(activity);
                     }
-                    callback.onSuccess(activities);
-                })
-                .addOnFailureListener(callback::onError);
+                }
+                callback.onSuccess(activities);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                callback.onError(new Exception(databaseError.getMessage()));
+            }
+        });
     }
 
-    // User profile operations
     public void updateUserProfile(String userId, Map<String, Object> updates, DatabaseCallback<Void> callback) {
-        db.collection("users").document(userId)
-                .update(updates)
+        databaseRef.child("users").child(userId)
+                .updateChildren(updates)
                 .addOnSuccessListener(aVoid -> callback.onSuccess(null))
                 .addOnFailureListener(callback::onError);
     }
 
     public void updateVolunteerHours(String userId, int hours, DatabaseCallback<Void> callback) {
         Map<String, Object> updates = new HashMap<>();
-        updates.put("volunteer_hours", FieldValue.increment(hours));
+        updates.put("volunteer_hours", hours);
         
-        db.collection("users").document(userId)
-                .update(updates)
+        databaseRef.child("users").child(userId)
+                .updateChildren(updates)
                 .addOnSuccessListener(aVoid -> callback.onSuccess(null))
                 .addOnFailureListener(callback::onError);
     }
 
-    // Search operations
     public void searchOpportunities(String query, DatabaseCallback<List<Opportunity>> callback) {
-        db.collection("opportunities")
-                .whereGreaterThanOrEqualTo("title", query)
-                .whereLessThanOrEqualTo("title", query + "\uf8ff")
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    List<Opportunity> opportunities = new ArrayList<>();
-                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                        Opportunity opportunity = document.toObject(Opportunity.class);
+        Query searchQuery = databaseRef.child("opportunities")
+                .orderByChild("title")
+                .startAt(query)
+                .endAt(query + "\uf8ff");
+
+        searchQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                List<Opportunity> opportunities = new ArrayList<>();
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                    if (opportunity != null && opportunity.getTitle().toLowerCase().contains(query.toLowerCase())) {
+                        opportunity.setId(snapshot.getKey());
                         opportunities.add(opportunity);
                     }
-                    callback.onSuccess(opportunities);
-                })
-                .addOnFailureListener(callback::onError);
+                }
+                callback.onSuccess(opportunities);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                callback.onError(new Exception(databaseError.getMessage()));
+            }
+        });
     }
 } 

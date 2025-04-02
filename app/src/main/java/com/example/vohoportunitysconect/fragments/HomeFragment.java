@@ -21,8 +21,12 @@ import com.example.vohoportunitysconect.models.Activity;
 import com.example.vohoportunitysconect.models.Opportunity;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,13 +43,13 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
     private ActivityAdapter activityAdapter;
     
     private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    private DatabaseReference databaseRef;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
     }
 
     @Nullable
@@ -106,67 +110,96 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
     private void loadUserData() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
-            db.collection("users").document(userId)
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists()) {
-                        String name = documentSnapshot.getString("name");
-                        welcomeText.setText("Welcome back, " + name + "!");
-                        
-                        // Update stats
-                        Long hours = documentSnapshot.getLong("volunteer_hours");
-                        Long projects = documentSnapshot.getLong("completed_projects");
-                        
-                        hoursText.setText(String.valueOf(hours != null ? hours : 0));
-                        projectsText.setText(String.valueOf(projects != null ? projects : 0));
+            databaseRef.child("users").child(userId)
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        if (dataSnapshot.exists()) {
+                            String name = dataSnapshot.child("name").getValue(String.class);
+                            welcomeText.setText("Welcome back, " + name + "!");
+                            
+                            // Update stats
+                            Long hours = dataSnapshot.child("volunteer_hours").getValue(Long.class);
+                            Long projects = dataSnapshot.child("completed_projects").getValue(Long.class);
+                            
+                            hoursText.setText(String.valueOf(hours != null ? hours : 0));
+                            projectsText.setText(String.valueOf(projects != null ? projects : 0));
+                        }
                     }
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(getContext(), "Error loading user data: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        Toast.makeText(getContext(), "Error loading user data: " + databaseError.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    }
                 });
         }
     }
 
     private void loadFeaturedOpportunities() {
-        db.collection("opportunities")
-            .whereEqualTo("featured", true)
-            .limit(5)
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
-                List<Opportunity> opportunities = queryDocumentSnapshots.toObjects(Opportunity.class);
+        Query opportunitiesQuery = databaseRef.child("opportunities")
+            .orderByChild("featured")
+            .equalTo(true)
+            .limitToFirst(5);
+
+        opportunitiesQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                List<Opportunity> opportunities = new ArrayList<>();
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                    if (opportunity != null) {
+                        opportunity.setId(snapshot.getKey());
+                        opportunities.add(opportunity);
+                    }
+                }
                 opportunityAdapter.setOpportunities(opportunities);
                 
                 // Show/hide view all button based on opportunities count
                 viewAllOpportunitiesButton.setVisibility(
                     opportunities.isEmpty() ? View.GONE : View.VISIBLE);
-            })
-            .addOnFailureListener(e -> {
-                Toast.makeText(getContext(), "Error loading featured opportunities: " + e.getMessage(),
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(getContext(), "Error loading featured opportunities: " + databaseError.getMessage(),
                         Toast.LENGTH_SHORT).show();
-            });
+            }
+        });
     }
 
     private void loadRecentActivity() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
-            db.collection("activities")
-                .whereEqualTo("userId", userId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .limit(10)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    List<Activity> activities = queryDocumentSnapshots.toObjects(Activity.class);
+            Query activitiesQuery = databaseRef.child("activities")
+                .orderByChild("userId")
+                .equalTo(userId)
+                .limitToLast(10);
+
+            activitiesQuery.addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    List<Activity> activities = new ArrayList<>();
+                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                        Activity activity = snapshot.getValue(Activity.class);
+                        if (activity != null) {
+                            activity.setId(snapshot.getKey());
+                            activities.add(activity);
+                        }
+                    }
                     activityAdapter.setActivities(activities);
                     
                     // Show/hide view all button based on activities count
                     viewAllActivityButton.setVisibility(
                         activities.isEmpty() ? View.GONE : View.VISIBLE);
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(getContext(), "Error loading recent activity: " + e.getMessage(),
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    Toast.makeText(getContext(), "Error loading recent activity: " + databaseError.getMessage(),
                             Toast.LENGTH_SHORT).show();
-                });
+                }
+            });
         }
     }
 

@@ -16,8 +16,12 @@ import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.adapters.ApplicationAdapter;
 import com.example.vohoportunitysconect.models.Application;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +31,7 @@ public class ApplicationListFragment extends Fragment {
     private RecyclerView recyclerView;
     private ApplicationAdapter adapter;
     private List<Application> applications;
-    private FirebaseFirestore db;
+    private DatabaseReference databaseRef;
     private FirebaseAuth auth;
     private Application.Status status;
 
@@ -60,7 +64,7 @@ public class ApplicationListFragment extends Fragment {
 
     private void initializeViews(View view) {
         recyclerView = view.findViewById(R.id.applications_recycler);
-        db = FirebaseFirestore.getInstance();
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
         auth = FirebaseAuth.getInstance();
         applications = new ArrayList<>();
     }
@@ -76,46 +80,29 @@ public class ApplicationListFragment extends Fragment {
 
     private void loadApplications() {
         String userId = auth.getCurrentUser().getUid();
-        db.collection("applications")
-                .whereEqualTo("userId", userId)
-                .whereEqualTo("status", status.name())
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    applications.clear();
-                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                        // Get the opportunity details from the opportunity document
-                        long opportunityId = document.getLong("opportunityId");
-                        db.collection("opportunities")
-                                .document(String.valueOf(opportunityId))
-                                .get()
-                                .addOnSuccessListener(opportunityDoc -> {
-                                    String opportunityTitle = opportunityDoc.getString("title");
-                                    String organizationImageUrl = opportunityDoc.getString("organizationImageUrl");
-                                    String organizationName = opportunityDoc.getString("organizationName");
-                                    Application application = new Application(
-                                            document.getId(),
-                                            document.getString("userId"),
-                                            document.getString("opportunityId"),
-                                            document.getString("opportunityTitle"),
-                                            document.getString("organizationId"),
-                                            document.getString("organizationName"),
-                                            document.getString("organizationImageUrl"),
-                                            document.getDate("appliedDate"),
-                                            Application.Status.fromString(document.getString("status")),
-                                            document.getString("coverLetter")
-                                    );
-                                    applications.add(application);
-                                    adapter.notifyDataSetChanged();
-                                })
-                                .addOnFailureListener(e -> {
-                                    Toast.makeText(getContext(), "Error loading opportunity details: " + e.getMessage(),
-                                            Toast.LENGTH_SHORT).show();
-                                });
+        Query applicationsQuery = databaseRef.child("applications")
+                .orderByChild("userId")
+                .equalTo(userId);
+
+        applicationsQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                applications.clear();
+                for (DataSnapshot applicationSnapshot : dataSnapshot.getChildren()) {
+                    Application application = applicationSnapshot.getValue(Application.class);
+                    if (application != null && application.getStatus() == status) {
+                        application.setId(applicationSnapshot.getKey());
+                        applications.add(application);
                     }
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(getContext(), "Error loading applications: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
-                });
+                }
+                adapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(getContext(), "Error loading applications: " + databaseError.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 } 

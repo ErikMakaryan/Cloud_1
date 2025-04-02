@@ -3,7 +3,7 @@ package com.example.vohoportunitysconect.utils;
 import android.content.Context;
 import android.widget.Toast;
 import com.google.firebase.auth.FirebaseAuthException;
-import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.storage.StorageException;
 
 public class FirebaseErrorHandler {
@@ -51,36 +51,56 @@ public class FirebaseErrorHandler {
         showError(context, errorMessage, recoveryAction);
     }
 
-    public static void handleFirestoreError(Context context, Exception e) {
+    public static void handleDatabaseError(Context context, Exception e) {
         String errorMessage;
         String recoveryAction = "Please try again.";
 
-        if (e instanceof FirebaseFirestoreException) {
-            FirebaseFirestoreException firestoreException = (FirebaseFirestoreException) e;
-            switch (firestoreException.getCode()) {
-                case PERMISSION_DENIED:
+        if (e instanceof DatabaseError) {
+            DatabaseError databaseError = (DatabaseError) e;
+            switch (databaseError.getCode()) {
+                case DatabaseError.PERMISSION_DENIED:
                     errorMessage = "Access denied.";
                     recoveryAction = "Please check your permissions.";
                     break;
-                case NOT_FOUND:
-                    errorMessage = "Document not found.";
-                    recoveryAction = "The requested data is not available.";
+                case DatabaseError.DISCONNECTED:
+                    errorMessage = "Disconnected from database.";
+                    recoveryAction = "Please check your internet connection.";
                     break;
-                case UNAVAILABLE:
+                case DatabaseError.EXPIRED_TOKEN:
+                    errorMessage = "Authentication expired.";
+                    recoveryAction = "Please sign in again.";
+                    break;
+                case DatabaseError.INVALID_TOKEN:
+                    errorMessage = "Invalid authentication.";
+                    recoveryAction = "Please sign in again.";
+                    break;
+                case DatabaseError.MAX_RETRIES:
+                    errorMessage = "Maximum retries exceeded.";
+                    recoveryAction = "Please try again later.";
+                    break;
+                case DatabaseError.NETWORK_ERROR:
+                    errorMessage = "Network error.";
+                    recoveryAction = "Please check your internet connection.";
+                    break;
+                case DatabaseError.OPERATION_FAILED:
+                    errorMessage = "Operation failed.";
+                    recoveryAction = "Please try again.";
+                    break;
+                case DatabaseError.OVERRIDDEN_BY_SET:
+                    errorMessage = "Data was overridden.";
+                    recoveryAction = "Your changes may not have been saved.";
+                    break;
+                case DatabaseError.UNAVAILABLE:
                     errorMessage = "Service unavailable.";
                     recoveryAction = "Please try again later.";
                     break;
-                case CANCELLED:
-                    errorMessage = "Operation cancelled.";
-                    recoveryAction = "Please try again.";
+                case DatabaseError.USER_CODE_EXCEPTION:
+                    errorMessage = "An error occurred in your code.";
+                    recoveryAction = "Please contact support.";
                     break;
-                case DEADLINE_EXCEEDED:
-                    errorMessage = "Request timed out.";
-                    recoveryAction = "Please check your connection and try again.";
-                    break;
-                case RESOURCE_EXHAUSTED:
-                    errorMessage = "Too many requests.";
-                    recoveryAction = "Please wait a moment and try again.";
+                case DatabaseError.WRITE_CANCELED:
+                    errorMessage = "Write operation cancelled.";
+                    recoveryAction = "Your changes were not saved.";
                     break;
                 default:
                     errorMessage = "Database error occurred.";

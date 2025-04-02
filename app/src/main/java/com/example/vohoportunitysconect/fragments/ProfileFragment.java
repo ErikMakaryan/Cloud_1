@@ -26,10 +26,13 @@ import com.example.vohoportunitysconect.models.Activity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ServerValue;
+import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
@@ -43,7 +46,7 @@ public class ProfileFragment extends Fragment {
     private MaterialButton editProfileButton, settingsButton, signOutButton, addHoursButton;
     private ActivityAdapter activityAdapter;
     private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    private DatabaseReference databaseRef;
     private StorageReference storageRef;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
 
@@ -51,7 +54,7 @@ public class ProfileFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
         storageRef = FirebaseStorage.getInstance().getReference("profile_images");
 
         // Handle image picking result
@@ -118,41 +121,59 @@ public class ProfileFragment extends Fragment {
     private void loadUserData() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
-            db.collection("users").document(userId).get()
-                    .addOnSuccessListener(documentSnapshot -> {
-                        if (documentSnapshot.exists()) {
-                            nameText.setText(documentSnapshot.getString("name"));
-                            emailText.setText(documentSnapshot.getString("email"));
-                            hoursText.setText(String.valueOf(documentSnapshot.getLong("volunteer_hours") != null ? documentSnapshot.getLong("volunteer_hours") : 0));
-                            opportunitiesText.setText(String.valueOf(documentSnapshot.getLong("completed_projects") != null ? documentSnapshot.getLong("completed_projects") : 0));
-                            applicationsCount.setText(String.valueOf(documentSnapshot.getLong("applications") != null ? documentSnapshot.getLong("applications") : 0));
+            DatabaseReference userRef = databaseRef.child("users").child(userId);
+            userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    if (dataSnapshot.exists()) {
+                        nameText.setText(dataSnapshot.child("name").getValue(String.class));
+                        emailText.setText(dataSnapshot.child("email").getValue(String.class));
+                        hoursText.setText(String.valueOf(dataSnapshot.child("volunteer_hours").getValue(Long.class) != null ? dataSnapshot.child("volunteer_hours").getValue(Long.class) : 0));
+                        opportunitiesText.setText(String.valueOf(dataSnapshot.child("completed_projects").getValue(Long.class) != null ? dataSnapshot.child("completed_projects").getValue(Long.class) : 0));
+                        applicationsCount.setText(String.valueOf(dataSnapshot.child("applications").getValue(Long.class) != null ? dataSnapshot.child("applications").getValue(Long.class) : 0));
 
-                            String imageUrl = documentSnapshot.getString("profile_image");
-                            if (imageUrl != null) {
-                                Glide.with(this).load(imageUrl).into(profileImage);
-                            }
+                        String imageUrl = dataSnapshot.child("profile_image").getValue(String.class);
+                        if (imageUrl != null) {
+                            Glide.with(ProfileFragment.this).load(imageUrl).into(profileImage);
                         }
-                    })
-                    .addOnFailureListener(e -> Toast.makeText(getContext(), "Error loading user data", Toast.LENGTH_SHORT).show());
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    Toast.makeText(getContext(), "Error loading user data", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
     }
 
     private void loadRecentActivity() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
-            db.collection("activities")
-                    .whereEqualTo("userId", userId)
-                    .orderBy("timestamp", Query.Direction.DESCENDING)
-                    .limit(5)
-                    .get()
-                    .addOnSuccessListener(queryDocumentSnapshots -> {
-                        List<Activity> activities = new ArrayList<>();
-                        for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                            activities.add(document.toObject(Activity.class));
+            Query activitiesQuery = databaseRef.child("activities")
+                    .orderByChild("userId")
+                    .equalTo(userId)
+                    .limitToLast(5);
+
+            activitiesQuery.addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    List<Activity> activities = new ArrayList<>();
+                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                        Activity activity = snapshot.getValue(Activity.class);
+                        if (activity != null) {
+                            activity.setId(snapshot.getKey());
+                            activities.add(activity);
                         }
-                        activityAdapter.setActivities(activities);
-                    })
-                    .addOnFailureListener(e -> Toast.makeText(getContext(), "Error loading activities", Toast.LENGTH_SHORT).show());
+                    }
+                    activityAdapter.setActivities(activities);
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    Toast.makeText(getContext(), "Error loading activities", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
     }
 
@@ -167,8 +188,9 @@ public class ProfileFragment extends Fragment {
 
     private void updateUserProfileImage(String imageUrl) {
         String userId = mAuth.getCurrentUser().getUid();
-        db.collection("users").document(userId)
-                .update("profile_image", imageUrl)
+        databaseRef.child("users").child(userId)
+                .child("profile_image")
+                .setValue(imageUrl)
                 .addOnSuccessListener(aVoid -> {
                     Glide.with(this).load(imageUrl).into(profileImage);
                     Toast.makeText(getContext(), "Profile picture updated!", Toast.LENGTH_SHORT).show();
@@ -178,9 +200,9 @@ public class ProfileFragment extends Fragment {
 
     private void addVolunteerHours(int hours) {
         String userId = mAuth.getCurrentUser().getUid();
-        DocumentReference userRef = db.collection("users").document(userId);
-
-        userRef.update("volunteer_hours", com.google.firebase.firestore.FieldValue.increment(hours))
+        databaseRef.child("users").child(userId)
+                .child("volunteer_hours")
+                .setValue(ServerValue.increment(hours))
                 .addOnSuccessListener(aVoid -> Toast.makeText(getContext(), "Hours updated!", Toast.LENGTH_SHORT).show())
                 .addOnFailureListener(e -> Toast.makeText(getContext(), "Failed to update hours!", Toast.LENGTH_SHORT).show());
     }

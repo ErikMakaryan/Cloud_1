@@ -18,10 +18,10 @@ import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.VOHApplication;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.UserProfileChangeRequest;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.database.DatabaseReference;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class SignUpActivity extends AppCompatActivity {
     private static final String TAG = "SignUpActivity";
@@ -35,7 +35,7 @@ public class SignUpActivity extends AppCompatActivity {
     private TextView loginLink;
     private ProgressBar progressBar;
     private FirebaseAuth firebaseAuth;
-    private FirebaseFirestore firestore;
+    private DatabaseReference databaseRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +44,7 @@ public class SignUpActivity extends AppCompatActivity {
 
         // Initialize Firebase
         firebaseAuth = FirebaseAuth.getInstance();
-        firestore = FirebaseFirestore.getInstance();
+        databaseRef = FirebaseAuth.getInstance().getDatabase().getReference();
 
         // Initialize views
         initializeViews();
@@ -87,7 +87,7 @@ public class SignUpActivity extends AppCompatActivity {
                             task.getResult().getUser().updateProfile(profileUpdates)
                                     .addOnCompleteListener(profileTask -> {
                                         if (profileTask.isSuccessful()) {
-                                            // Save user data to Firestore
+                                            // Save user data to Realtime Database
                                             saveUserToFirestore(task.getResult().getUser().getUid(), name, email, userType);
                                         } else {
                                             showLoading(false);
@@ -109,14 +109,13 @@ public class SignUpActivity extends AppCompatActivity {
     }
 
     private void saveUserToFirestore(String userId, String name, String email, String userType) {
-        HashMap<String, Object> userData = new HashMap<>();
+        Map<String, Object> userData = new HashMap<>();
         userData.put("name", name);
         userData.put("email", email);
         userData.put("userType", userType);
         userData.put("createdAt", System.currentTimeMillis());
 
-        firestore.collection("users").document(userId)
-                .set(userData, SetOptions.merge())
+        databaseRef.child("users").child(userId).setValue(userData)
                 .addOnSuccessListener(aVoid -> {
                     // Save user data to local preferences
                     VOHApplication.getInstance().getDataManager()

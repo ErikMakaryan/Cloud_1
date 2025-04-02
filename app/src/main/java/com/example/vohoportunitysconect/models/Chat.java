@@ -1,9 +1,11 @@
 package com.example.vohoportunitysconect.models;
 
-import com.google.firebase.firestore.Exclude;
+import com.google.firebase.database.Exclude;
+import com.google.firebase.database.IgnoreExtraProperties;
 import java.util.ArrayList;
 import java.util.List;
 
+@IgnoreExtraProperties
 public class Chat {
     @Exclude
     private String id;

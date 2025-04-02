@@ -1,7 +1,9 @@
 package com.example.vohoportunitysconect.models;
 
-import com.google.firebase.firestore.Exclude;
+import com.google.firebase.database.Exclude;
+import com.google.firebase.database.IgnoreExtraProperties;
 
+@IgnoreExtraProperties
 public class Achievement {
     @Exclude
     private String id;

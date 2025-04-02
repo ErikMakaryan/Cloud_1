@@ -1,9 +1,10 @@
 package com.example.vohoportunitysconect.models;
 
-import com.google.firebase.firestore.Exclude;
-import com.google.firebase.firestore.PropertyName;
+import com.google.firebase.database.Exclude;
+import com.google.firebase.database.IgnoreExtraProperties;
 import java.util.Date;
 
+@IgnoreExtraProperties
 public class UserActivity {
     @Exclude
     private String id;
@@ -23,7 +24,7 @@ public class UserActivity {
         REVIEWED
     }
 
-    // Empty constructor for Firestore
+    // Empty constructor for Realtime Database
     public UserActivity() {
     }
 

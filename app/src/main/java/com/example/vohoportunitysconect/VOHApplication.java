@@ -4,8 +4,7 @@ import android.app.Application;
 import android.os.StrictMode;
 import android.util.Log;
 import com.example.vohoportunitysconect.database.DataManager;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.FirebaseFirestoreSettings;
+import com.google.firebase.database.FirebaseDatabase;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.example.vohoportunitysconect.BuildConfig;
@@ -28,20 +27,16 @@ public class VOHApplication extends Application {
             // Initialize data manager
             dataManager = DataManager.getInstance(this);
             
-            // Enable Firestore offline persistence
-            FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder()
-                .setPersistenceEnabled(true)
-                .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
-                .setSslEnabled(true)
-                .build();
-            FirebaseFirestore.getInstance().setFirestoreSettings(settings);
+            // Initialize Firebase Database with specific URL
+            FirebaseDatabase database = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com");
+            database.setPersistenceEnabled(true);
             
             // Enable strict mode in debug builds
             if (BuildConfig.DEBUG) {
                 StrictMode.enableDefaults();
             }
             
-            Log.d(TAG, "Application initialized successfully");
+            Log.d(TAG, "Application initialized successfully with Firebase Database URL");
         } catch (Exception e) {
             Log.e(TAG, "Error initializing application: " + e.getMessage(), e);
         }

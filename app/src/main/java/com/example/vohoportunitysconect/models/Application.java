@@ -1,9 +1,11 @@
 package com.example.vohoportunitysconect.models;
 
-import com.google.firebase.firestore.Exclude;
+import com.google.firebase.database.Exclude;
+import com.google.firebase.database.IgnoreExtraProperties;
 
 import java.util.Date;
 
+@IgnoreExtraProperties
 public class Application {
     @Exclude
     private String id;
@@ -45,7 +47,7 @@ public class Application {
     }
 
     public Application() {
-        // Required empty constructor for Firestore
+        // Required empty constructor for Realtime Database
     }
 
     public Application(String userId, String opportunityId, String coverLetter) {

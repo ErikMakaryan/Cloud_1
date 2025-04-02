@@ -28,6 +28,10 @@ import com.google.firebase.firestore.Source;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.example.vohoportunitysconect.utils.NetworkManager;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
@@ -38,7 +42,7 @@ public class LoginActivity extends AppCompatActivity {
     private Button signUpButton;
     private ProgressBar progressBar;
     private FirebaseAuth firebaseAuth;
-    private FirebaseFirestore firestore;
+    private FirebaseDatabase databaseRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,7 +64,7 @@ public class LoginActivity extends AppCompatActivity {
 
             // Initialize Firebase
             firebaseAuth = FirebaseAuth.getInstance();
-            firestore = FirebaseFirestore.getInstance();
+            databaseRef = FirebaseDatabase.getInstance();
 
             // Initialize views
             initializeViews();
@@ -118,90 +122,59 @@ public class LoginActivity extends AppCompatActivity {
                                     String userId = task.getResult().getUser().getUid();
                                     Log.d(TAG, "User signed in successfully with ID: " + userId);
                                     
-                                    // Get user data from Firestore with offline persistence
-                                    firestore.collection("users").document(userId)
-                                            .get(Source.CACHE)  // Try cache first
-                                            .addOnSuccessListener(documentSnapshot -> {
-                                                try {
-                                                    if (documentSnapshot.exists()) {
-                                                        String name = documentSnapshot.getString("name");
-                                                        String userType = documentSnapshot.getString("userType");
-                                                        
-                                                        if (name != null && userType != null) {
-                                                            // Save user data
-                                                            VOHApplication.getInstance().getDataManager()
-                                                                    .saveUserData(userId, email, name);
-                                                            VOHApplication.getInstance().getDataManager()
-                                                                    .saveUserType(userType);
-                                                            // Save password for persistent sign-in
-                                                            VOHApplication.getInstance().getDataManager()
-                                                                    .saveCurrentUserPassword(passwordInput.getText().toString().trim());
+                                    // Get user data from Realtime Database
+                                    databaseRef.child("users").child(userId)
+                                            .addListenerForSingleValueEvent(new ValueEventListener() {
+                                                @Override
+                                                public void onDataChange(DataSnapshot dataSnapshot) {
+                                                    try {
+                                                        if (dataSnapshot.exists()) {
+                                                            String name = dataSnapshot.child("name").getValue(String.class);
+                                                            String userType = dataSnapshot.child("userType").getValue(String.class);
                                                             
-                                                            Log.d(TAG, "User data saved successfully");
-                                                            navigateToMain();
+                                                            if (name != null && userType != null) {
+                                                                // Save user data
+                                                                VOHApplication.getInstance().getDataManager()
+                                                                        .saveUserData(userId, email, name);
+                                                                VOHApplication.getInstance().getDataManager()
+                                                                        .saveUserType(userType);
+                                                                // Save password for persistent sign-in
+                                                                VOHApplication.getInstance().getDataManager()
+                                                                        .saveCurrentUserPassword(passwordInput.getText().toString().trim());
+                                                                
+                                                                Log.d(TAG, "User data saved successfully");
+                                                                navigateToMain();
+                                                            } else {
+                                                                showLoading(false);
+                                                                Log.e(TAG, "User data is incomplete");
+                                                                Toast.makeText(LoginActivity.this,
+                                                                        "Error: User data is incomplete",
+                                                                        Toast.LENGTH_SHORT).show();
+                                                            }
                                                         } else {
                                                             showLoading(false);
-                                                            Log.e(TAG, "User data is incomplete");
+                                                            Log.e(TAG, "User document not found");
                                                             Toast.makeText(LoginActivity.this,
-                                                                    "Error: User data is incomplete",
+                                                                    "Error: User data not found",
                                                                     Toast.LENGTH_SHORT).show();
                                                         }
-                                                    } else {
-                                                        // If not in cache, try server
-                                                        firestore.collection("users").document(userId)
-                                                                .get(Source.SERVER)
-                                                                .addOnSuccessListener(serverSnapshot -> {
-                                                                    if (serverSnapshot.exists()) {
-                                                                        String name = serverSnapshot.getString("name");
-                                                                        String userType = serverSnapshot.getString("userType");
-                                                                        
-                                                                        if (name != null && userType != null) {
-                                                                            VOHApplication.getInstance().getDataManager()
-                                                                                    .saveUserData(userId, email, name);
-                                                                            VOHApplication.getInstance().getDataManager()
-                                                                                    .saveUserType(userType);
-                                                                            VOHApplication.getInstance().getDataManager()
-                                                                                    .saveCurrentUserPassword(passwordInput.getText().toString().trim());
-                                                                            
-                                                                            Log.d(TAG, "User data saved successfully from server");
-                                                                            navigateToMain();
-                                                                        } else {
-                                                                            showLoading(false);
-                                                                            Log.e(TAG, "User data is incomplete from server");
-                                                                            Toast.makeText(LoginActivity.this,
-                                                                                    "Error: User data is incomplete",
-                                                                                    Toast.LENGTH_SHORT).show();
-                                                                        }
-                                                                    } else {
-                                                                        showLoading(false);
-                                                                        Log.e(TAG, "User document not found on server");
-                                                                        Toast.makeText(LoginActivity.this,
-                                                                                "Error: User data not found",
-                                                                                Toast.LENGTH_SHORT).show();
-                                                                    }
-                                                                })
-                                                                .addOnFailureListener(e -> {
-                                                                    showLoading(false);
-                                                                    Log.e(TAG, "Error getting user data from server", e);
-                                                                    Toast.makeText(LoginActivity.this,
-                                                                            "Error: Unable to access user data. Please check your connection.",
-                                                                            Toast.LENGTH_SHORT).show();
-                                                                });
+                                                    } catch (Exception e) {
+                                                        showLoading(false);
+                                                        Log.e(TAG, "Error processing user data", e);
+                                                        Toast.makeText(LoginActivity.this,
+                                                                "Error: Unable to process user data",
+                                                                Toast.LENGTH_SHORT).show();
                                                     }
-                                                } catch (Exception e) {
+                                                }
+
+                                                @Override
+                                                public void onCancelled(DatabaseError databaseError) {
                                                     showLoading(false);
-                                                    Log.e(TAG, "Error processing user data", e);
+                                                    Log.e(TAG, "Error getting user data", databaseError.toException());
                                                     Toast.makeText(LoginActivity.this,
-                                                            "Error: Unable to process user data",
+                                                            "Error: Unable to access user data. Please check your connection.",
                                                             Toast.LENGTH_SHORT).show();
                                                 }
-                                            })
-                                            .addOnFailureListener(e -> {
-                                                showLoading(false);
-                                                Log.e(TAG, "Error getting user data from cache", e);
-                                                Toast.makeText(LoginActivity.this,
-                                                        "Error: Unable to access user data. Please check your connection.",
-                                                        Toast.LENGTH_SHORT).show();
                                             });
                                 } else {
                                     showLoading(false);

@@ -20,8 +20,12 @@ import com.example.vohoportunitysconect.adapters.OpportunityAdapter;
 import com.example.vohoportunitysconect.models.Opportunity;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +36,12 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
     private SearchView searchView;
     private ChipGroup filterChipGroup;
     private List<Opportunity> opportunities;
-    private FirebaseFirestore db;
+    private DatabaseReference databaseRef;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        db = FirebaseFirestore.getInstance();
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
         opportunities = new ArrayList<>();
     }
 
@@ -85,18 +89,30 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
     }
 
     private void loadOpportunities() {
-        db.collection("opportunities")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
+        Query opportunitiesQuery = databaseRef.child("opportunities")
+            .orderByChild("createdAt")
+            .limitToLast(50);
+
+        opportunitiesQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 opportunities.clear();
-                opportunities.addAll(queryDocumentSnapshots.toObjects(Opportunity.class));
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                    if (opportunity != null) {
+                        opportunity.setId(snapshot.getKey());
+                        opportunities.add(opportunity);
+                    }
+                }
                 adapter.setOpportunities(opportunities);
-            })
-            .addOnFailureListener(e -> {
-                Toast.makeText(getContext(), "Error loading opportunities: " + e.getMessage(),
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(getContext(), "Error loading opportunities: " + databaseError.getMessage(),
                         Toast.LENGTH_SHORT).show();
-            });
+            }
+        });
     }
 
     private void filterOpportunities() {

@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
@@ -12,8 +13,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.adapters.OpportunityAdapter;
 import com.example.vohoportunitysconect.models.Opportunity;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,10 +26,14 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
     private RecyclerView opportunitiesRecycler;
     private OpportunityAdapter opportunityAdapter;
     private List<Opportunity> opportunities = new ArrayList<>();
+    private DatabaseReference databaseRef;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_opportunities, container, false);
+        
+        // Initialize Firebase Database
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
         
         opportunitiesRecycler = root.findViewById(R.id.opportunities_recycler);
         opportunitiesRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -37,22 +46,30 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
     }
 
     private void loadOpportunities() {
-        FirebaseFirestore.getInstance()
-            .collection("opportunities")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
+        Query opportunitiesQuery = databaseRef.child("opportunities")
+            .orderByChild("createdAt")
+            .limitToLast(50);
+
+        opportunitiesQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 opportunities.clear();
-                for (var doc : queryDocumentSnapshots) {
-                    Opportunity opportunity = doc.toObject(Opportunity.class);
-                    opportunity.setId(doc.getId());
-                    opportunities.add(opportunity);
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                    if (opportunity != null) {
+                        opportunity.setId(snapshot.getKey());
+                        opportunities.add(opportunity);
+                    }
                 }
                 opportunityAdapter.notifyDataSetChanged();
-            })
-            .addOnFailureListener(e -> {
-                // Handle error
-            });
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(getContext(), "Error loading opportunities: " + databaseError.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override

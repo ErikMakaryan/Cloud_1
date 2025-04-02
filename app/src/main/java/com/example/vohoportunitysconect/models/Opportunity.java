@@ -1,10 +1,11 @@
 package com.example.vohoportunitysconect.models;
 
-import com.google.firebase.firestore.Exclude;
-import com.google.firebase.firestore.PropertyName;
+import com.google.firebase.database.Exclude;
+import com.google.firebase.database.IgnoreExtraProperties;
 import java.util.Date;
 import java.util.List;
 
+@IgnoreExtraProperties
 public class Opportunity {
     public enum Difficulty {
         EASY("easy"),
@@ -43,9 +44,7 @@ public class Opportunity {
     private Date deadline;
     private String imageUrl;
     private List<String> categories;
-    @PropertyName("is_remote")
     private boolean isRemote;
-    @PropertyName("required_hours")
     private int requiredHours;
     private boolean featured;
     private Difficulty difficulty;
@@ -60,7 +59,7 @@ public class Opportunity {
     private Date updatedAt;
     private String date;
 
-    // Empty constructor for Firestore
+    // Empty constructor for Firebase
     public Opportunity() {
         this.featured = false;
         this.isActive = true;
@@ -174,22 +173,18 @@ public class Opportunity {
         this.categories = categories;
     }
 
-    @PropertyName("is_remote")
     public boolean isRemote() {
         return isRemote;
     }
 
-    @PropertyName("is_remote")
     public void setRemote(boolean remote) {
         isRemote = remote;
     }
 
-    @PropertyName("required_hours")
     public int getRequiredHours() {
         return requiredHours;
     }
 
-    @PropertyName("required_hours")
     public void setRequiredHours(int requiredHours) {
         this.requiredHours = requiredHours;
     }
