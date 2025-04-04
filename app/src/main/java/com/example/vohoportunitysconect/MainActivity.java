@@ -1,6 +1,7 @@
 package com.example.vohoportunitysconect;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -35,12 +36,18 @@ import com.google.firebase.auth.FirebaseUser;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "MainActivity";
+    private static final String PREF_NAME = "VOHPrefs";
+    private static final String KEY_USER_EMAIL = "user_email";
+    private static final String KEY_USER_PASSWORD = "user_password";
+    
     private DrawerLayout drawerLayout;
     private NavigationView navigationView;
     private BottomNavigationView bottomNavigationView;
     private NavController navController;
     private AppBarConfiguration appBarConfiguration;
     private FirebaseAuth mAuth;
+    private ActionBarDrawerToggle toggle;
+    private SharedPreferences sharedPreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,36 +55,37 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         try {
             setContentView(R.layout.activity_main);
 
+            // Initialize SharedPreferences
+            sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+
             mAuth = FirebaseAuth.getInstance();
             FirebaseUser currentUser = mAuth.getCurrentUser();
             
+            // Initialize views first
+            drawerLayout = findViewById(R.id.drawer_layout);
+            navigationView = findViewById(R.id.nav_view);
+            bottomNavigationView = findViewById(R.id.bottom_navigation);
+            
+            // Setup toolbar
+            Toolbar toolbar = findViewById(R.id.toolbar);
+            setSupportActionBar(toolbar);
+
+            // Initialize NavController
+            NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
+                    .findFragmentById(R.id.nav_host_fragment);
+            if (navHostFragment == null) {
+                throw new IllegalStateException("NavHostFragment not found");
+            }
+            navController = navHostFragment.getNavController();
+
             // Check if user is signed in
             if (currentUser == null) {
-                // Check if we have saved user data
-                String savedEmail = VOHApplication.getInstance().getDataManager().getCurrentUserEmail();
-                if (savedEmail != null) {
-                    // Try to sign in with saved credentials
-                    mAuth.signInWithEmailAndPassword(savedEmail, 
-                            VOHApplication.getInstance().getDataManager().getCurrentUserPassword())
-                            .addOnCompleteListener(this, task -> {
-                                if (task.isSuccessful()) {
-                                    setupToolbarAndDrawer();
-                                    setupNavigation();
-                                    updateNavigationHeader();
-                                } else {
-                                    // If saved credentials don't work, clear them and redirect to login
-                                    VOHApplication.getInstance().getDataManager().clearUserData();
-                                    redirectToLogin();
-                                }
-                            });
-                } else {
-                    redirectToLogin();
-                }
+                // Try to restore session
+                restoreUserSession();
                 return;
             }
 
-            setupToolbarAndDrawer();
-            setupNavigation();
+            setupNavigation(toolbar);
             updateNavigationHeader();
 
         } catch (Exception e) {
@@ -99,59 +107,71 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         });
     }
 
-    private void setupToolbarAndDrawer() {
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowTitleEnabled(true);
+    private void restoreUserSession() {
+        String email = sharedPreferences.getString(KEY_USER_EMAIL, null);
+        String password = sharedPreferences.getString(KEY_USER_PASSWORD, null);
+
+        if (email != null && password != null) {
+            mAuth.signInWithEmailAndPassword(email, password)
+                    .addOnCompleteListener(this, task -> {
+                        if (task.isSuccessful()) {
+                            Log.d(TAG, "Session restored successfully");
+                            setupNavigation(findViewById(R.id.toolbar));
+                            updateNavigationHeader();
+                        } else {
+                            Log.e(TAG, "Error restoring session", task.getException());
+                            clearUserSession();
+                            redirectToLogin();
+                        }
+                    });
+        } else {
+            redirectToLogin();
         }
+    }
 
-        drawerLayout = findViewById(R.id.drawer_layout);
-        navigationView = findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(this);
+    public void saveUserSession(String email, String password) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(KEY_USER_EMAIL, email);
+        editor.putString(KEY_USER_PASSWORD, password);
+        editor.apply();
+    }
 
-        // Setup drawer toggle
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+    private void clearUserSession() {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.remove(KEY_USER_EMAIL);
+        editor.remove(KEY_USER_PASSWORD);
+        editor.apply();
+    }
+
+    private void setupNavigation(Toolbar toolbar) {
+        // Configure the drawer layout
+        toggle = new ActionBarDrawerToggle(
                 this, drawerLayout, toolbar,
                 R.string.navigation_drawer_open,
                 R.string.navigation_drawer_close);
         drawerLayout.addDrawerListener(toggle);
         toggle.syncState();
 
-        // Setup bottom navigation
-        bottomNavigationView = findViewById(R.id.bottom_navigation);
-    }
+        // Setup navigation view
+        navigationView.setNavigationItemSelectedListener(this);
 
-    private void setupNavigation() {
-        NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.nav_host_fragment);
-        if (navHostFragment != null) {
-            navController = navHostFragment.getNavController();
-            
-            appBarConfiguration = new AppBarConfiguration.Builder(
-                    R.id.nav_home,
-                    R.id.nav_opportunities,
-                    R.id.nav_applications,
-                    R.id.nav_saved,
-                    R.id.nav_profile
-            ).setOpenableLayout(drawerLayout).build();
+        // Configure AppBarConfiguration
+        appBarConfiguration = new AppBarConfiguration.Builder(
+                R.id.nav_home,
+                R.id.nav_opportunities,
+                R.id.nav_applications,
+                R.id.nav_saved,
+                R.id.nav_profile
+        ).setOpenableLayout(drawerLayout).build();
 
-            NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
-            NavigationUI.setupWithNavController(navigationView, navController);
-            NavigationUI.setupWithNavController(bottomNavigationView, navController);
+        // Setup UI with NavController
+        NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
+        NavigationUI.setupWithNavController(navigationView, navController);
+        NavigationUI.setupWithNavController(bottomNavigationView, navController);
 
-            setupDestinationChangeListener();
-        } else {
-            Log.e(TAG, "NavHostFragment not found");
-            Toast.makeText(this, "Error initializing navigation", Toast.LENGTH_LONG).show();
-            redirectToLogin();
-        }
-    }
-
-    private void setupDestinationChangeListener() {
+        // Setup destination change listener
         navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
-            // Hide bottom navigation for non-main destinations
+            // Hide bottom navigation for specific destinations
             if (destination.getId() == R.id.nav_opportunity_details) {
                 bottomNavigationView.setVisibility(View.GONE);
             } else {
@@ -167,10 +187,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     @Override
     public boolean onSupportNavigateUp() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START);
-            return true;
-        }
         return NavigationUI.navigateUp(navController, appBarConfiguration)
                 || super.onSupportNavigateUp();
     }
@@ -184,23 +200,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             return true;
         }
         
-        // Handle navigation
-        try {
-            boolean handled = NavigationUI.onNavDestinationSelected(item, navController);
-            if (handled) {
-                drawerLayout.closeDrawer(GravityCompat.START);
-            }
-            return handled;
-        } catch (Exception e) {
-            Log.e(TAG, "Error navigating to destination: " + e.getMessage(), e);
-            Toast.makeText(this, "Error navigating to selected item", Toast.LENGTH_SHORT).show();
-            return false;
+        boolean handled = NavigationUI.onNavDestinationSelected(item, navController);
+        if (handled) {
+            drawerLayout.closeDrawer(GravityCompat.START);
         }
+        return handled;
     }
 
     private void handleLogout() {
         try {
             mAuth.signOut();
+            clearUserSession();
             redirectToLogin();
         } catch (Exception e) {
             Log.e(TAG, "Error during logout: " + e.getMessage(), e);
@@ -209,31 +219,67 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void redirectToLogin() {
-        startActivity(new Intent(this, LoginActivity.class));
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
         finish();
     }
 
     private void updateNavigationHeader() {
         try {
+            if (navigationView == null) {
+                Log.e(TAG, "Navigation view is null");
+                return;
+            }
+
             View headerView = navigationView.getHeaderView(0);
+            if (headerView == null) {
+                Log.e(TAG, "Header view is null");
+                return;
+            }
+
             ShapeableImageView profileImage = headerView.findViewById(R.id.nav_header_image);
             TextView userNameText = headerView.findViewById(R.id.nav_header_name);
             TextView userEmailText = headerView.findViewById(R.id.nav_header_email);
 
-            // Get current user info from local database
-            String currentUserEmail = VOHApplication.getInstance().getDataManager().getCurrentUserEmail();
-            if (currentUserEmail != null) {
-                User currentUser = VOHApplication.getInstance().getDataManager().getUserByEmail(currentUserEmail);
-                if (currentUser != null) {
-                    userNameText.setText(currentUser.getName());
-                    userEmailText.setText(currentUser.getEmail());
+            // Check if views are properly inflated
+            if (userNameText == null || userEmailText == null) {
+                Log.e(TAG, "Navigation header views not found");
+                return;
+            }
 
-                    // Load profile image using Glide
+            FirebaseUser user = mAuth.getCurrentUser();
+            if (user != null) {
+                // Set email
+                String email = user.getEmail();
+                if (email != null && !email.isEmpty()) {
+                    userEmailText.setText(email);
+                } else {
+                    userEmailText.setText(R.string.no_email);
+                }
+
+                // Set name
+                String displayName = user.getDisplayName();
+                if (displayName != null && !displayName.isEmpty()) {
+                    userNameText.setText(displayName);
+                } else {
+                    userNameText.setText(R.string.anonymous_user);
+                }
+
+                // Load profile image if view exists
+                if (profileImage != null && user.getPhotoUrl() != null) {
                     Glide.with(this)
-                            .load(R.drawable.default_profile_image)
+                            .load(user.getPhotoUrl())
+                            .placeholder(R.drawable.default_profile_image)
+                            .error(R.drawable.default_profile_image)
                             .circleCrop()
                             .into(profileImage);
+                } else if (profileImage != null) {
+                    profileImage.setImageResource(R.drawable.default_profile_image);
                 }
+            } else {
+                Log.e(TAG, "Current user is null");
+                redirectToLogin();
             }
         } catch (Exception e) {
             Log.e(TAG, "Error updating navigation header: " + e.getMessage(), e);
@@ -244,5 +290,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main, menu);
         return true;
+    }
+
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        if (toggle != null) {
+            toggle.syncState();
+        }
     }
 }

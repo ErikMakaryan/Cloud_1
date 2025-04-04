@@ -1,6 +1,6 @@
 package com.example.vohoportunitysconect.models;
 
-import com.google.firebase.firestore.Exclude;
+import com.google.firebase.database.Exclude;
 
 public class Message {
     @Exclude

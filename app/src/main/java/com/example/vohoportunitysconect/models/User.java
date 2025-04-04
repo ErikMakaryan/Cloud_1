@@ -49,7 +49,7 @@ public class User {
     public User(String name, String email, String userType) {
         this.name = name;
         this.email = email;
-        this.userType = UserType.valueOf(userType);
+        this.userType = UserType.fromValue(userType);
         this.createdAt = System.currentTimeMillis();
         this.interests = new ArrayList<>();
         this.skills = new ArrayList<>();

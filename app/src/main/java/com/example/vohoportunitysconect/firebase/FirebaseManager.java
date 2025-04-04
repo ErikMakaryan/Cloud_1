@@ -8,24 +8,30 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import java.util.HashMap;
 import java.util.Map;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.auth.AuthResult;
+import com.google.firebase.database.DatabaseError;
 
 public class FirebaseManager {
     private static final String TAG = "FirebaseManager";
     private static FirebaseManager instance;
     private FirebaseAuth auth;
-    private FirebaseFirestore db;
+    private FirebaseDatabase database;
+    private DatabaseReference dbRef;
     private Context context;
+    private boolean isInitialized = false;
+    private Map<String, DataSnapshot> userDataCache;
 
     private FirebaseManager() {
         auth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        userDataCache = new HashMap<>();
     }
 
     public static synchronized FirebaseManager getInstance() {
@@ -36,11 +42,62 @@ public class FirebaseManager {
     }
 
     public void initialize(Context context) {
+        if (context == null) {
+            Log.e(TAG, "Context cannot be null");
+            return;
+        }
         this.context = context.getApplicationContext();
+        
         if (!checkGooglePlayServices()) {
             Log.e(TAG, "Google Play Services not available");
             return;
         }
+
+        try {
+            // Initialize Firebase Database with persistence
+            database = FirebaseDatabase.getInstance("https://vohoportunitysconect-default-rtdb.firebaseio.com");
+            database.setPersistenceEnabled(true);
+            dbRef = database.getReference();
+            
+            // Add auth state listener
+            auth.addAuthStateListener(firebaseAuth -> {
+                FirebaseUser user = firebaseAuth.getCurrentUser();
+                if (user != null) {
+                    Log.d(TAG, "User is signed in: " + user.getUid());
+                    // Pre-fetch user data when signed in
+                    prefetchUserData(user.getUid());
+                } else {
+                    Log.d(TAG, "User is signed out");
+                    userDataCache.clear();
+                }
+            });
+            
+            isInitialized = true;
+            Log.d(TAG, "FirebaseManager initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing FirebaseManager: " + e.getMessage(), e);
+        }
+    }
+
+    private void prefetchUserData(String userId) {
+        if (userDataCache.containsKey(userId)) {
+            return;
+        }
+        
+        dbRef.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    userDataCache.put(userId, dataSnapshot);
+                    Log.d(TAG, "User data prefetched for: " + userId);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e(TAG, "Error prefetching user data: " + databaseError.getMessage());
+            }
+        });
     }
 
     private boolean checkGooglePlayServices() {
@@ -58,8 +115,15 @@ public class FirebaseManager {
         return true;
     }
 
+    private void checkInitialization() {
+        if (!isInitialized) {
+            throw new IllegalStateException("FirebaseManager must be initialized with a context before use");
+        }
+    }
+
     // Authentication Methods
-    public void signUp(String email, String password, String name, OnCompleteListener listener) {
+    public void signUp(String email, String password, String name, OnCompleteListener<AuthResult> listener) {
+        checkInitialization();
         if (!checkGooglePlayServices()) {
             listener.onComplete(null);
             return;
@@ -68,150 +132,245 @@ public class FirebaseManager {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(task -> {
                 if (task.isSuccessful() && task.getResult().getUser() != null) {
-                    // Create user profile in Firestore
-                    createUserProfile(task.getResult().getUser().getUid(), name, email);
+                    // Create user profile in Realtime Database
+                    createUserProfile(task.getResult().getUser().getUid(), name, email, "user");
                 }
                 listener.onComplete(task);
             });
     }
 
-    public void signIn(String email, String password, OnCompleteListener listener) {
+    public void signIn(String email, String password, OnCompleteListener<AuthResult> listener) {
+        checkInitialization();
         if (!checkGooglePlayServices()) {
             listener.onComplete(null);
             return;
         }
 
         auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener(listener);
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult().getUser() != null) {
+                    String userId = task.getResult().getUser().getUid();
+                    // Check cache first
+                    if (userDataCache.containsKey(userId)) {
+                        DataSnapshot cachedData = userDataCache.get(userId);
+                        if (cachedData != null && cachedData.exists()) {
+                            Log.d(TAG, "Using cached user data for: " + userId);
+                            listener.onComplete(task);
+                            return;
+                        }
+                    }
+                }
+                listener.onComplete(task);
+            });
     }
 
     public void signOut() {
+        checkInitialization();
         auth.signOut();
     }
 
     public FirebaseUser getCurrentUser() {
+        checkInitialization();
         return auth.getCurrentUser();
     }
 
-    // Firestore Methods
-    private void createUserProfile(String userId, String name, String email) {
+    // Realtime Database Methods
+    public Task<Void> createUserProfile(String userId, String name, String email, String userType) {
+        checkInitialization();
         if (!checkGooglePlayServices()) {
-            return;
+            return Tasks.forException(new Exception("Google Play Services not available"));
         }
-
-        Map<String, Object> user = new HashMap<>();
-        user.put("name", name);
-        user.put("email", email);
-        user.put("totalHours", 0);
-        user.put("completedProjects", 0);
-        user.put("createdAt", System.currentTimeMillis());
-
-        db.collection("users").document(userId)
-            .set(user)
-            .addOnSuccessListener(aVoid -> Log.d(TAG, "User profile created"))
-            .addOnFailureListener(e -> Log.e(TAG, "Error creating user profile", e));
+        
+        Map<String, Object> userProfile = new HashMap<>();
+        userProfile.put("name", name);
+        userProfile.put("email", email);
+        userProfile.put("userType", userType);
+        userProfile.put("createdAt", System.currentTimeMillis());
+        userProfile.put("totalHours", 0);
+        userProfile.put("opportunitiesCount", 0);
+        
+        return dbRef.child("users").child(userId).setValue(userProfile);
     }
-
-    public void getUserProfile(String userId, OnCompleteListener<DocumentSnapshot> listener) {
-        if (!checkGooglePlayServices()) {
-            listener.onComplete(null);
-            return;
-        }
-
-        db.collection("users").document(userId)
-            .get()
-            .addOnCompleteListener(listener);
-    }
-
-    public void getFeaturedOpportunities(OnCompleteListener<QuerySnapshot> listener) {
+    
+    public void getUserProfile(String userId, OnCompleteListener<DataSnapshot> listener) {
         if (!checkGooglePlayServices()) {
             listener.onComplete(null);
             return;
         }
-
-        db.collection("opportunities")
-            .whereEqualTo("featured", true)
-            .limit(5)
-            .get()
+        
+        dbRef.child("users").child(userId).get()
             .addOnCompleteListener(listener);
     }
-
-    public void getUserActivities(String userId, OnCompleteListener<QuerySnapshot> listener) {
+    
+    public void getFeaturedOpportunities(OnCompleteListener<DataSnapshot> listener) {
         if (!checkGooglePlayServices()) {
             listener.onComplete(null);
             return;
         }
-
-        db.collection("activities")
-            .whereEqualTo("userId", userId)
-            .orderBy("timestamp")
-            .limit(5)
+        
+        dbRef.child("opportunities")
+            .orderByChild("isFeatured")
+            .equalTo(true)
+            .limitToFirst(10)
             .get()
             .addOnCompleteListener(listener);
     }
-
+    
+    public void getUserActivities(String userId, OnCompleteListener<DataSnapshot> listener) {
+        if (!checkGooglePlayServices()) {
+            listener.onComplete(null);
+            return;
+        }
+        
+        dbRef.child("activities")
+            .orderByChild("userId")
+            .equalTo(userId)
+            .limitToLast(20)
+            .get()
+            .addOnCompleteListener(listener);
+    }
+    
     public void logVolunteerHours(String userId, String opportunityId, double hours, String description) {
         if (!checkGooglePlayServices()) {
             return;
         }
-
+        
+        String activityId = dbRef.child("activities").push().getKey();
+        if (activityId == null) {
+            Log.e(TAG, "Failed to generate activity ID");
+            return;
+        }
+        
         Map<String, Object> activity = new HashMap<>();
         activity.put("userId", userId);
         activity.put("opportunityId", opportunityId);
         activity.put("hours", hours);
         activity.put("description", description);
         activity.put("timestamp", System.currentTimeMillis());
-
-        db.collection("activities")
-            .add(activity)
-            .addOnSuccessListener(documentReference -> {
-                // Update user's total hours
-                updateUserStats(userId, hours);
-            })
-            .addOnFailureListener(e -> Log.e(TAG, "Error logging hours", e));
+        
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("/activities/" + activityId, activity);
+        
+        dbRef.updateChildren(updates)
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    Log.d(TAG, "Volunteer hours logged successfully");
+                    updateUserStats(userId, hours);
+                } else {
+                    Log.e(TAG, "Failed to log volunteer hours", task.getException());
+                }
+            });
     }
-
+    
     private void updateUserStats(String userId, double newHours) {
         if (!checkGooglePlayServices()) {
             return;
         }
-
-        db.collection("users").document(userId)
-            .get()
-            .addOnSuccessListener(documentSnapshot -> {
-                if (documentSnapshot.exists()) {
-                    double currentHours = documentSnapshot.getDouble("totalHours") != null ? 
-                        documentSnapshot.getDouble("totalHours") : 0;
-                    long completedProjects = documentSnapshot.getLong("completedProjects") != null ?
-                        documentSnapshot.getLong("completedProjects") : 0;
-
+        
+        dbRef.child("users").child(userId).get()
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult().getValue() != null) {
+                    DataSnapshot snapshot = task.getResult();
+                    double currentHours = 0;
+                    int opportunitiesCount = 0;
+                    
+                    if (snapshot.child("totalHours").getValue() != null) {
+                        currentHours = ((Number) snapshot.child("totalHours").getValue()).doubleValue();
+                    }
+                    
+                    if (snapshot.child("opportunitiesCount").getValue() != null) {
+                        opportunitiesCount = ((Number) snapshot.child("opportunitiesCount").getValue()).intValue();
+                    }
+                    
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("totalHours", currentHours + newHours);
-                    updates.put("completedProjects", completedProjects + 1);
-
-                    documentSnapshot.getReference().update(updates)
-                        .addOnSuccessListener(aVoid -> Log.d(TAG, "User stats updated"))
-                        .addOnFailureListener(e -> Log.e(TAG, "Error updating user stats", e));
+                    updates.put("opportunitiesCount", opportunitiesCount + 1);
+                    
+                    dbRef.child("users").child(userId).updateChildren(updates)
+                        .addOnCompleteListener(updateTask -> {
+                            if (updateTask.isSuccessful()) {
+                                Log.d(TAG, "User stats updated successfully");
+                            } else {
+                                Log.e(TAG, "Failed to update user stats", updateTask.getException());
+                            }
+                        });
                 }
             });
     }
-
-    private void handleTask(Task<?> task, OnCompleteListener<Object> listener) {
-        if (!task.isSuccessful()) {
-            Exception exception = task.getException();
-            Log.e(TAG, "Error: " + (exception != null ? exception.getMessage() : "Unknown error"));
-            listener.onComplete(Tasks.forException(exception != null ? exception : new Exception("Unknown error")));
+    
+    private <T> void handleTask(Task<T> task, OnCompleteListener<T> listener) {
+        if (task.isSuccessful()) {
+            listener.onComplete(task);
+        } else {
+            Log.e(TAG, "Task failed", task.getException());
+            listener.onComplete(null);
+        }
+    }
+    
+    public <T> void executeTask(Task<T> task, OnCompleteListener<T> listener) {
+        if (!checkGooglePlayServices()) {
+            listener.onComplete(null);
             return;
         }
-        listener.onComplete(Tasks.forResult(task.getResult()));
+        
+        task.addOnCompleteListener(result -> handleTask(result, listener));
     }
 
-    public void executeTask(Task<?> task, OnCompleteListener<Object> listener) {
-        if (task == null) {
-            listener.onComplete(Tasks.forResult(null));
+    public void deleteAllUsers(OnCompleteListener<Void> listener) {
+        if (!checkGooglePlayServices()) {
+            listener.onComplete(null);
             return;
         }
 
-        task.addOnCompleteListener(t -> handleTask(t, listener));
+        // Delete all users from Realtime Database
+        dbRef.child("users").removeValue()
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    Log.d(TAG, "All users deleted from Realtime Database");
+                } else {
+                    Log.e(TAG, "Error deleting users from Realtime Database", task.getException());
+                }
+            });
+
+        // Delete all users from Firebase Authentication
+        auth.getCurrentUser().delete()
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    Log.d(TAG, "Current user deleted from Firebase Authentication");
+                } else {
+                    Log.e(TAG, "Error deleting current user from Firebase Authentication", task.getException());
+                }
+                listener.onComplete(task);
+            });
+    }
+
+    public void getUserData(String userId, ValueEventListener listener) {
+        checkInitialization();
+        
+        // Check cache first
+        if (userDataCache.containsKey(userId)) {
+            DataSnapshot cachedData = userDataCache.get(userId);
+            if (cachedData != null && cachedData.exists()) {
+                Log.d(TAG, "Using cached user data for: " + userId);
+                listener.onDataChange(cachedData);
+                return;
+            }
+        }
+        
+        // If not in cache, fetch from database
+        dbRef.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    userDataCache.put(userId, dataSnapshot);
+                }
+                listener.onDataChange(dataSnapshot);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                listener.onCancelled(databaseError);
+            }
+        });
     }
 } 

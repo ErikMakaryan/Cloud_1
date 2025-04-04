@@ -55,57 +55,9 @@ public class FirebaseErrorHandler {
         String errorMessage;
         String recoveryAction = "Please try again.";
 
-        if (e instanceof DatabaseError) {
-            DatabaseError databaseError = (DatabaseError) e;
-            switch (databaseError.getCode()) {
-                case DatabaseError.PERMISSION_DENIED:
-                    errorMessage = "Access denied.";
-                    recoveryAction = "Please check your permissions.";
-                    break;
-                case DatabaseError.DISCONNECTED:
-                    errorMessage = "Disconnected from database.";
-                    recoveryAction = "Please check your internet connection.";
-                    break;
-                case DatabaseError.EXPIRED_TOKEN:
-                    errorMessage = "Authentication expired.";
-                    recoveryAction = "Please sign in again.";
-                    break;
-                case DatabaseError.INVALID_TOKEN:
-                    errorMessage = "Invalid authentication.";
-                    recoveryAction = "Please sign in again.";
-                    break;
-                case DatabaseError.MAX_RETRIES:
-                    errorMessage = "Maximum retries exceeded.";
-                    recoveryAction = "Please try again later.";
-                    break;
-                case DatabaseError.NETWORK_ERROR:
-                    errorMessage = "Network error.";
-                    recoveryAction = "Please check your internet connection.";
-                    break;
-                case DatabaseError.OPERATION_FAILED:
-                    errorMessage = "Operation failed.";
-                    recoveryAction = "Please try again.";
-                    break;
-                case DatabaseError.OVERRIDDEN_BY_SET:
-                    errorMessage = "Data was overridden.";
-                    recoveryAction = "Your changes may not have been saved.";
-                    break;
-                case DatabaseError.UNAVAILABLE:
-                    errorMessage = "Service unavailable.";
-                    recoveryAction = "Please try again later.";
-                    break;
-                case DatabaseError.USER_CODE_EXCEPTION:
-                    errorMessage = "An error occurred in your code.";
-                    recoveryAction = "Please contact support.";
-                    break;
-                case DatabaseError.WRITE_CANCELED:
-                    errorMessage = "Write operation cancelled.";
-                    recoveryAction = "Your changes were not saved.";
-                    break;
-                default:
-                    errorMessage = "Database error occurred.";
-                    break;
-            }
+        if (e instanceof com.google.firebase.database.DatabaseException) {
+            com.google.firebase.database.DatabaseException databaseException = (com.google.firebase.database.DatabaseException) e;
+            errorMessage = "Database error: " + databaseException.getMessage();
         } else {
             errorMessage = "An unexpected error occurred.";
         }

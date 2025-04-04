@@ -12,9 +12,12 @@ import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.adapters.CertificateAdapter;
 import com.example.vohoportunitysconect.models.Certificate;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +26,7 @@ public class CertificatesActivity extends AppCompatActivity {
     private RecyclerView certificatesRecyclerView;
     private CertificateAdapter certificateAdapter;
     private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    private DatabaseReference dbRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,7 +35,7 @@ public class CertificatesActivity extends AppCompatActivity {
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        dbRef = FirebaseDatabase.getInstance().getReference();
 
         // Initialize views
         certificatesRecyclerView = findViewById(R.id.certificates_recycler_view);
@@ -48,24 +51,35 @@ public class CertificatesActivity extends AppCompatActivity {
 
     private void loadCertificates() {
         String userId = mAuth.getCurrentUser().getUid();
-        db.collection("certificates")
-            .whereEqualTo("userId", userId)
-            .orderBy("issueDate", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
+        Query query = dbRef.child("certificates")
+            .orderByChild("userId")
+            .equalTo(userId);
+            
+        query.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
                 List<Certificate> certificates = new ArrayList<>();
-                for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                    Certificate certificate = document.toObject(Certificate.class);
-                    certificates.add(certificate);
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Certificate certificate = snapshot.getValue(Certificate.class);
+                    if (certificate != null) {
+                        certificate.setId(snapshot.getKey());
+                        certificates.add(certificate);
+                    }
                 }
                 certificateAdapter.setCertificates(certificates);
 
                 // Show empty state if no certificates
                 findViewById(R.id.empty_state).setVisibility(
                     certificates.isEmpty() ? View.VISIBLE : View.GONE);
-            })
-            .addOnFailureListener(e -> 
-                Toast.makeText(this, "Error loading certificates", Toast.LENGTH_SHORT).show());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(CertificatesActivity.this, 
+                    "Error loading certificates: " + databaseError.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void onCertificateClick(Certificate certificate) {

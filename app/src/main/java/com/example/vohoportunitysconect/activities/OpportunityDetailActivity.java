@@ -19,13 +19,18 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 public class OpportunityDetailActivity extends AppCompatActivity {
@@ -42,7 +47,7 @@ public class OpportunityDetailActivity extends AppCompatActivity {
     private TextView ratingText;
     
     private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    private DatabaseReference dbRef;
     private String opportunityId;
     private Opportunity opportunity;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
@@ -56,7 +61,7 @@ public class OpportunityDetailActivity extends AppCompatActivity {
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        dbRef = FirebaseDatabase.getInstance().getReference();
 
         // Get opportunity ID from intent
         opportunityId = getIntent().getStringExtra("opportunity_id");
@@ -90,42 +95,63 @@ public class OpportunityDetailActivity extends AppCompatActivity {
     }
 
     private void loadOpportunityDetails() {
-        db.collection("opportunities").document(opportunityId)
-            .get()
-            .addOnSuccessListener(documentSnapshot -> {
-                opportunity = documentSnapshot.toObject(Opportunity.class);
-                if (opportunity != null) {
-                    titleText.setText(opportunity.getTitle());
-                    organizationText.setText(opportunity.getOrganization());
-                    descriptionText.setText(opportunity.getDescription());
-                    locationChip.setText(opportunity.getLocation());
-                    difficultyChip.setText(opportunity.getDifficulty().toString());
-                    deadlineChip.setText(dateFormat.format(opportunity.getDeadline()));
-                    categoryChip.setText(opportunity.getCategory());
-                    skillsChip.setText(opportunity.getSkills());
+        dbRef.child("opportunities").child(opportunityId)
+            .addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    opportunity = dataSnapshot.getValue(Opportunity.class);
+                    if (opportunity != null) {
+                        opportunity.setId(dataSnapshot.getKey());
+                        titleText.setText(opportunity.getTitle());
+                        organizationText.setText(opportunity.getOrganization());
+                        descriptionText.setText(opportunity.getDescription());
+                        locationChip.setText(opportunity.getLocation());
+                        difficultyChip.setText(opportunity.getDifficulty().toString());
+                        deadlineChip.setText(dateFormat.format(opportunity.getDeadline()));
+                        categoryChip.setText(opportunity.getCategory());
+                        skillsChip.setText(opportunity.getSkills());
 
-                    // Check if user has already applied
-                    checkApplicationStatus();
+                        // Check if user has already applied
+                        checkApplicationStatus();
+                    }
                 }
-            })
-            .addOnFailureListener(e -> {
-                Toast.makeText(this, "Error loading opportunity details", Toast.LENGTH_SHORT).show();
-                finish();
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+                    Toast.makeText(OpportunityDetailActivity.this, 
+                        "Error loading opportunity details: " + databaseError.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                    finish();
+                }
             });
     }
 
     private void checkApplicationStatus() {
         String userId = mAuth.getCurrentUser().getUid();
-        db.collection("applications")
-            .whereEqualTo("userId", userId)
-            .whereEqualTo("opportunityId", opportunityId)
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
-                if (!queryDocumentSnapshots.isEmpty()) {
-                    applyButton.setText("Applied");
-                    applyButton.setEnabled(false);
+        Query query = dbRef.child("applications")
+            .orderByChild("userId")
+            .equalTo(userId);
+            
+        query.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Application application = snapshot.getValue(Application.class);
+                    if (application != null && application.getOpportunityId().equals(opportunityId)) {
+                        applyButton.setText("Applied");
+                        applyButton.setEnabled(false);
+                        break;
+                    }
                 }
-            });
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(OpportunityDetailActivity.this, 
+                    "Error checking application status: " + databaseError.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void showApplicationDialog() {
@@ -148,46 +174,66 @@ public class OpportunityDetailActivity extends AppCompatActivity {
         String userId = mAuth.getCurrentUser().getUid();
         String applicationId = UUID.randomUUID().toString();
 
-        Application application = new Application(
-            UUID.randomUUID().toString(),
-            mAuth.getCurrentUser().getUid(),
-            opportunityId,
-            opportunity.getTitle(),
-            opportunity.getOrganizationId(),
-            opportunity.getOrganization(),
-            null, // organizationImageUrl
-            new Date(),
-            Application.Status.PENDING,
-            "" // coverLetter
-        );
+        Map<String, Object> application = new HashMap<>();
+        application.put("id", applicationId);
+        application.put("userId", userId);
+        application.put("opportunityId", opportunityId);
+        application.put("title", opportunity.getTitle());
+        application.put("organizationId", opportunity.getOrganizationId());
+        application.put("organization", opportunity.getOrganization());
+        application.put("organizationImageUrl", "");
+        application.put("appliedAt", System.currentTimeMillis());
+        application.put("status", "PENDING");
+        application.put("coverLetter", message);
 
-        db.collection("applications").document(applicationId)
-            .set(application)
+        dbRef.child("applications").child(applicationId).setValue(application)
             .addOnSuccessListener(aVoid -> {
                 Toast.makeText(this, "Application submitted successfully", Toast.LENGTH_SHORT).show();
                 applyButton.setText("Applied");
                 applyButton.setEnabled(false);
 
                 // Update user's application count
-                DocumentReference userRef = db.collection("users").document(userId);
-                userRef.update("applications", com.google.firebase.firestore.FieldValue.increment(1));
+                dbRef.child("users").child(userId).child("applications")
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(DataSnapshot dataSnapshot) {
+                            int currentCount = dataSnapshot.exists() ? 
+                                dataSnapshot.getValue(Integer.class) : 0;
+                            dbRef.child("users").child(userId)
+                                .child("applications")
+                                .setValue(currentCount + 1);
+                        }
+
+                        @Override
+                        public void onCancelled(DatabaseError databaseError) {
+                            Toast.makeText(OpportunityDetailActivity.this, 
+                                "Error updating application count: " + databaseError.getMessage(), 
+                                Toast.LENGTH_SHORT).show();
+                        }
+                    });
             })
             .addOnFailureListener(e -> 
-                Toast.makeText(this, "Error submitting application", Toast.LENGTH_SHORT).show());
+                Toast.makeText(this, "Error submitting application: " + e.getMessage(), 
+                    Toast.LENGTH_SHORT).show());
     }
 
     private void loadRatings() {
-        db.collection("ratings")
-            .whereEqualTo("targetId", opportunityId)
-            .whereEqualTo("targetType", "opportunity")
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
+        Query query = dbRef.child("ratings")
+            .orderByChild("targetId")
+            .equalTo(opportunityId);
+            
+        query.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
                 float totalRating = 0;
-                ratingCount = queryDocumentSnapshots.size();
+                ratingCount = 0;
                 
-                for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                    Rating rating = document.toObject(Rating.class);
-                    totalRating += rating.getRating();
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Rating rating = snapshot.getValue(Rating.class);
+                    if (rating != null && rating.getTargetType().equals("opportunity")) {
+                        totalRating += rating.getRating();
+                        ratingCount++;
+                    }
                 }
                 
                 if (ratingCount > 0) {
@@ -197,33 +243,52 @@ public class OpportunityDetailActivity extends AppCompatActivity {
 
                 // Check if user has already rated
                 checkUserRating();
-            })
-            .addOnFailureListener(e -> 
-                Toast.makeText(this, "Error loading ratings", Toast.LENGTH_SHORT).show());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(OpportunityDetailActivity.this, 
+                    "Error loading ratings: " + databaseError.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void updateRatingDisplay() {
-        if (ratingCount > 0) {
-            String ratingText = String.format(Locale.getDefault(), "%.1f ★ (%d reviews)", 
-                averageRating, ratingCount);
-            this.ratingText.setText(ratingText);
-        } else {
-            this.ratingText.setText(R.string.no_ratings);
-        }
+        ratingText.setText(String.format(Locale.getDefault(), 
+            "%.1f (%d ratings)", averageRating, ratingCount));
     }
 
     private void checkUserRating() {
         String userId = mAuth.getCurrentUser().getUid();
-        db.collection("ratings")
-            .whereEqualTo("targetId", opportunityId)
-            .whereEqualTo("targetType", "opportunity")
-            .whereEqualTo("userId", userId)
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
-                if (!queryDocumentSnapshots.isEmpty()) {
-                    rateButton.setText("Update Rating");
+        Query query = dbRef.child("ratings")
+            .orderByChild("userId")
+            .equalTo(userId);
+            
+        query.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                boolean hasRated = false;
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Rating rating = snapshot.getValue(Rating.class);
+                    if (rating != null && 
+                        rating.getTargetId().equals(opportunityId) && 
+                        rating.getTargetType().equals("opportunity")) {
+                        hasRated = true;
+                        break;
+                    }
                 }
-            });
+                rateButton.setEnabled(!hasRated);
+                rateButton.setText(hasRated ? "Already Rated" : "Rate");
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(OpportunityDetailActivity.this, 
+                    "Error checking user rating: " + databaseError.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void showRatingDialog() {
@@ -232,7 +297,7 @@ public class OpportunityDetailActivity extends AppCompatActivity {
         TextInputEditText commentInput = dialogView.findViewById(R.id.comment_input);
 
         new MaterialAlertDialogBuilder(this)
-            .setTitle("Rate this Opportunity")
+            .setTitle("Rate Opportunity")
             .setView(dialogView)
             .setPositiveButton("Submit", (dialog, which) -> {
                 float rating = ratingBar.getRating();
@@ -248,23 +313,22 @@ public class OpportunityDetailActivity extends AppCompatActivity {
         String userId = mAuth.getCurrentUser().getUid();
         String ratingId = UUID.randomUUID().toString();
 
-        Rating ratingObj = new Rating(
-            ratingId,
-            userId,
-            opportunityId,
-            "opportunity",
-            rating,
-            comment,
-            new Date()
-        );
+        Map<String, Object> ratingData = new HashMap<>();
+        ratingData.put("id", ratingId);
+        ratingData.put("userId", userId);
+        ratingData.put("targetId", opportunityId);
+        ratingData.put("targetType", "opportunity");
+        ratingData.put("rating", rating);
+        ratingData.put("comment", comment);
+        ratingData.put("createdAt", System.currentTimeMillis());
 
-        db.collection("ratings").document(ratingId)
-            .set(ratingObj)
+        dbRef.child("ratings").child(ratingId).setValue(ratingData)
             .addOnSuccessListener(aVoid -> {
                 Toast.makeText(this, "Rating submitted successfully", Toast.LENGTH_SHORT).show();
-                loadRatings(); // Reload ratings to update display
+                loadRatings();
             })
             .addOnFailureListener(e -> 
-                Toast.makeText(this, "Error submitting rating", Toast.LENGTH_SHORT).show());
+                Toast.makeText(this, "Error submitting rating: " + e.getMessage(), 
+                    Toast.LENGTH_SHORT).show());
     }
 } 

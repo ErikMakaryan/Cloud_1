@@ -13,9 +13,12 @@ import com.example.vohoportunitysconect.adapters.OpportunityAdapter;
 import com.example.vohoportunitysconect.models.Opportunity;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +26,7 @@ import java.util.List;
 public class BrowseOpportunitiesActivity extends AppCompatActivity {
     private RecyclerView opportunitiesRecyclerView;
     private OpportunityAdapter opportunityAdapter;
-    private FirebaseFirestore db;
+    private DatabaseReference dbRef;
     private FirebaseAuth mAuth;
     private FloatingActionButton createOpportunityFab;
 
@@ -33,7 +36,7 @@ public class BrowseOpportunitiesActivity extends AppCompatActivity {
         setContentView(R.layout.activity_browse_opportunities);
 
         // Initialize Firebase
-        db = FirebaseFirestore.getInstance();
+        dbRef = FirebaseDatabase.getInstance().getReference();
         mAuth = FirebaseAuth.getInstance();
 
         // Initialize views
@@ -54,19 +57,30 @@ public class BrowseOpportunitiesActivity extends AppCompatActivity {
     }
 
     private void loadOpportunities() {
-        db.collection("opportunities")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener(queryDocumentSnapshots -> {
+        Query query = dbRef.child("opportunities")
+            .orderByChild("createdAt");
+            
+        query.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
                 List<Opportunity> opportunities = new ArrayList<>();
-                for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                    Opportunity opportunity = document.toObject(Opportunity.class);
-                    opportunities.add(opportunity);
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                    if (opportunity != null) {
+                        opportunity.setId(snapshot.getKey());
+                        opportunities.add(opportunity);
+                    }
                 }
                 opportunityAdapter.setOpportunities(opportunities);
-            })
-            .addOnFailureListener(e -> 
-                Toast.makeText(this, "Error loading opportunities", Toast.LENGTH_SHORT).show());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(BrowseOpportunitiesActivity.this, 
+                    "Error loading opportunities: " + databaseError.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void onOpportunityClick(Opportunity opportunity) {

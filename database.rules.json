@@ -1,25 +1,33 @@
 {
   "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && auth.uid == $uid",
+        "savedOpportunities": {
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && auth.uid == $uid"
+        }
       }
     },
     "opportunities": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('userType').val() == 'organization'",
-      "$oppId": {
+      ".write": "auth != null",
+      "$opportunityId": {
         ".read": "auth != null",
-        ".write": "auth != null && root.child('users').child(auth.uid).child('userType').val() == 'organization'"
+        ".write": "auth != null"
       }
     },
     "applications": {
       ".read": "auth != null",
       ".write": "auth != null",
-      "$appId": {
-        ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('opportunities').child(data.child('oppId').val()).child('createdBy').val() == auth.uid)",
-        ".write": "auth != null && (data.child('userId').val() == auth.uid || root.child('opportunities').child(data.child('oppId').val()).child('createdBy').val() == auth.uid)"
+      "$opportunityId": {
+        "$userId": {
+          ".read": "auth != null && (auth.uid == $userId || root.child('opportunities').child($opportunityId).child('organizationId').val() == auth.uid)",
+          ".write": "auth != null && (auth.uid == $userId || root.child('opportunities').child($opportunityId).child('organizationId').val() == auth.uid)"
+        }
       }
     }
   }

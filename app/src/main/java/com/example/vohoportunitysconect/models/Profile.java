@@ -14,7 +14,7 @@ public class Profile {
     private String phone;
     private String bio;
     private String profileImageUrl;
-    private String userType;
+    private UserType userType;
     private float rating;
     private int ratingCount;
     private int completedOpportunitiesCount;
@@ -35,7 +35,7 @@ public class Profile {
     public Profile(String name, String email, String userType) {
         this.name = name;
         this.email = email;
-        this.userType = userType;
+        this.userType = UserType.fromValue(userType);
         this.interests = new ArrayList<>();
         this.skills = new ArrayList<>();
         this.rating = 0;
@@ -94,11 +94,11 @@ public class Profile {
         this.profileImageUrl = profileImageUrl;
     }
 
-    public String getUserType() {
+    public UserType getUserType() {
         return userType;
     }
 
-    public void setUserType(String userType) {
+    public void setUserType(UserType userType) {
         this.userType = userType;
     }
 

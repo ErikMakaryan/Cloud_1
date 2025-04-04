@@ -1,6 +1,6 @@
 package com.example.vohoportunitysconect.models;
 
-import com.google.firebase.firestore.Exclude;
+import com.google.firebase.database.Exclude;
 import java.util.ArrayList;
 import java.util.List;
 

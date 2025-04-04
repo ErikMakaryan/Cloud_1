@@ -8,8 +8,7 @@ import android.net.NetworkRequest;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.MainThread;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.FirebaseFirestoreSettings;
+import com.google.firebase.database.FirebaseDatabase;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -21,32 +20,14 @@ public class NetworkManager {
     private final ConnectivityManager connectivityManager;
     private final List<NetworkCallback> callbacks;
     private final AtomicBoolean isOnline;
-    private final FirebaseFirestore db;
     private ConnectivityManager.NetworkCallback networkCallback;
     private volatile boolean isNetworkAvailable;
 
     private NetworkManager(@NonNull Context context) {
-        Context appContext = context.getApplicationContext();
-        if (appContext == null) {
-            throw new IllegalStateException("Application context is null");
-        }
-        
-        this.context = appContext;
-        this.connectivityManager = (ConnectivityManager) appContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-        
-        if (this.connectivityManager == null) {
-            throw new IllegalStateException("ConnectivityManager not available");
-        }
-        
+        this.context = context.getApplicationContext();
+        this.connectivityManager = (ConnectivityManager) this.context.getSystemService(Context.CONNECTIVITY_SERVICE);
         this.callbacks = new ArrayList<>();
         this.isOnline = new AtomicBoolean(false);
-        
-        // Initialize Firestore with persistence enabled
-        this.db = FirebaseFirestore.getInstance();
-        FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder()
-                .setPersistenceEnabled(true)
-                .build();
-        db.setFirestoreSettings(settings);
         
         setupNetworkCallback();
     }
@@ -83,7 +64,6 @@ public class NetworkManager {
                         (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ? "WIFI" :
                          networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ? "CELLULAR" :
                          networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ? "ETHERNET" : "UNKNOWN"));
-                    enableOfflinePersistence();
                 }
                 notifyCallbacks(isConnected);
             }
@@ -93,7 +73,6 @@ public class NetworkManager {
                 isNetworkAvailable = false;
                 isOnline.set(false);
                 Log.d(TAG, "Network connection lost");
-                disableOfflinePersistence();
                 notifyCallbacks(false);
             }
         };
@@ -176,29 +155,6 @@ public class NetworkManager {
             } catch (IllegalArgumentException e) {
                 Log.e(TAG, "Error unregistering network callback: " + e.getMessage());
             }
-        }
-    }
-
-    private void enableOfflinePersistence() {
-        if (isNetworkAvailable()) {
-            db.enableNetwork()
-                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Online mode enabled"))
-                    .addOnFailureListener(e -> Log.e(TAG, "Failed to enable online mode", e));
-        }
-    }
-
-    private void disableOfflinePersistence() {
-        if (!isNetworkAvailable()) {
-            db.disableNetwork()
-                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Offline mode enabled"))
-                    .addOnFailureListener(e -> Log.e(TAG, "Failed to enable offline mode", e));
-        }
-    }
-
-    public void syncPendingChanges() {
-        if (!isNetworkAvailable()) {
-            Log.d(TAG, "Cannot sync changes: offline");
-            return;
         }
     }
 } 

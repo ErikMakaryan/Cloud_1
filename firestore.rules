@@ -59,39 +59,21 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && 
-                   request.auth.uid == userId && 
-                   isValidUserData();
-      allow update: if isOwner(userId) && isValidUserData();
-      allow delete: if isOwner(userId);
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Opportunities collection
     match /opportunities/{opportunityId} {
-      allow read: if isAuthenticated();
-      allow create: if isOrganization() && 
-                   isValidOpportunity() &&
-                   request.resource.data.organizationId == request.auth.uid;
-      allow update: if isOrganization() && 
-                   isValidOpportunity() &&
-                   resource.data.organizationId == request.auth.uid;
-      allow delete: if isOrganization() && 
-                   resource.data.organizationId == request.auth.uid;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'organization';
     }
 
     // Applications collection
     match /applications/{applicationId} {
-      allow read: if isAuthenticated() && 
-                 (resource.data.userId == request.auth.uid || 
-                  resource.data.organizationId == request.auth.uid);
-      allow create: if isVolunteer() && 
-                   request.resource.data.userId == request.auth.uid;
-      allow update: if isOrganization() && 
-                   resource.data.organizationId == request.auth.uid &&
-                   request.resource.data.status in ['pending', 'accepted', 'rejected'];
-      allow delete: if isVolunteer() && 
-                   resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
     // Activities collection

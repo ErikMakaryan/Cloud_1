@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.example.vohoportunitysconect.models.User;
+import com.example.vohoportunitysconect.models.UserType;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -30,7 +31,7 @@ public class DataManager {
 
     private DataManager(Context context) {
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+        databaseRef = FirebaseDatabase.getInstance("https://vohoportunitysconect-default-rtdb.firebaseio.com").getReference();
     }
 
     public static synchronized DataManager getInstance(Context context) {
@@ -134,7 +135,7 @@ public class DataManager {
                 user.setId(userId);
                 user.setEmail(email);
                 user.setName(getCurrentUserName());
-                user.setUserType(getCurrentUserType());
+                user.setUserType(UserType.fromValue(getCurrentUserType()));
                 return user;
             }
         } catch (Exception e) {

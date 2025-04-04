@@ -1,5 +1,6 @@
 package com.example.vohoportunitysconect.adapters;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -45,7 +46,11 @@ public class ActivityAdapter extends RecyclerView.Adapter<ActivityAdapter.Activi
     }
 
     public void setActivities(List<Activity> activities) {
-        this.activities = activities;
+        if (activities != null) {
+            this.activities = activities;
+        } else {
+            this.activities = new ArrayList<>();
+        }
         notifyDataSetChanged();
     }
 
@@ -66,13 +71,43 @@ public class ActivityAdapter extends RecyclerView.Adapter<ActivityAdapter.Activi
         }
 
         public void bind(Activity activity) {
-            titleText.setText(activity.getType());
-            descriptionText.setText(activity.getDescription());
-            
-            dateText.setText(dateFormat.format(new Date(activity.getCreatedAt())));
-            
-            // Since Activity model doesn't have hours, we'll hide the hours text
-            hoursText.setVisibility(View.GONE);
+            if (activity == null) {
+                return;
+            }
+
+            try {
+                // Set title
+                String title = activity.getType();
+                if (title == null || title.isEmpty()) {
+                    title = "Activity";
+                }
+                titleText.setText(title);
+
+                // Set description
+                String description = activity.getDescription();
+                if (description == null || description.isEmpty()) {
+                    description = "No description available";
+                }
+                descriptionText.setText(description);
+
+                // Set date
+                Date timestamp = activity.getTimestamp();
+                if (timestamp != null) {
+                    dateText.setText(dateFormat.format(timestamp));
+                } else {
+                    dateText.setText("Date not available");
+                }
+
+                // Set hours if available
+                if (activity.getHours() > 0) {
+                    hoursText.setVisibility(View.VISIBLE);
+                    hoursText.setText(String.format(Locale.getDefault(), "%d hours", activity.getHours()));
+                } else {
+                    hoursText.setVisibility(View.GONE);
+                }
+            } catch (Exception e) {
+                Log.e("ActivityAdapter", "Error binding activity: " + e.getMessage());
+            }
         }
     }
 } 

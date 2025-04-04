@@ -137,12 +137,13 @@
                                 android:textStyle="bold"
                                 android:layout_marginTop="8dp"/>
 
-                            <Button
+                            <com.google.android.material.button.MaterialButton
                                 android:id="@+id/add_hours_button"
-                                android:layout_width="wrap_content"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:text="Add Hours"
-                                android:layout_marginTop="8dp"/>
+                                android:visibility="gone"
+                                app:backgroundTint="@color/primary"/>
 
                             <TextView
                                 android:id="@+id/opportunities_text"
@@ -227,6 +228,15 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Settings" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/create_opportunity_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Create Opportunity"
+                android:visibility="gone"
+                app:backgroundTint="@color/primary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/sign_out_button"

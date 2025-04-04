@@ -90,7 +90,7 @@ public class ApplicationListFragment extends Fragment {
                 applications.clear();
                 for (DataSnapshot applicationSnapshot : dataSnapshot.getChildren()) {
                     Application application = applicationSnapshot.getValue(Application.class);
-                    if (application != null && application.getStatus() == status) {
+                    if (application != null && application.getStatusEnum() == status) {
                         application.setId(applicationSnapshot.getKey());
                         applications.add(application);
                     }

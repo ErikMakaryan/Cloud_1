@@ -25,6 +25,7 @@ import com.example.vohoportunitysconect.models.UserActivity;
 import com.example.vohoportunitysconect.models.Opportunity;
 import com.google.android.material.chip.Chip;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -58,6 +59,14 @@ public class OpportunityDetailsActivity extends AppCompatActivity {
         databaseManager = DatabaseManager.getInstance();
         dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
 
+        // Check authentication state
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(this, "Please sign in to view opportunity details", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         // Initialize views
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -75,12 +84,23 @@ public class OpportunityDetailsActivity extends AppCompatActivity {
 
         // Get opportunity ID from intent
         String opportunityId = getIntent().getStringExtra("opportunity_id");
-        if (opportunityId != null && !opportunityId.isEmpty()) {
-            loadOpportunity(opportunityId);
+        if (opportunityId == null || opportunityId.isEmpty()) {
+            Toast.makeText(this, "Invalid opportunity ID", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
         }
 
+        // Load opportunity details
+        loadOpportunity(opportunityId);
+
         // Set up apply button
-        applyButton.setOnClickListener(v -> applyForOpportunity());
+        applyButton.setOnClickListener(v -> {
+            if (mAuth.getCurrentUser() == null) {
+                Toast.makeText(this, "Please sign in to apply", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            applyForOpportunity();
+        });
 
         backCallback = new OnBackPressedCallback(true) {
             @Override
@@ -100,22 +120,34 @@ public class OpportunityDetailsActivity extends AppCompatActivity {
         databaseManager.getOpportunity(opportunityId, new DatabaseManager.DatabaseCallback<Opportunity>() {
             @Override
             public void onSuccess(Opportunity result) {
-                opportunity = result;
-                if (opportunity != null) {
-                    updateUI();
+                if (result == null) {
+                    Toast.makeText(OpportunityDetailsActivity.this,
+                        "Opportunity not found",
+                        Toast.LENGTH_SHORT).show();
+                    finish();
+                    return;
                 }
+                opportunity = result;
+                updateUI();
             }
 
             @Override
             public void onError(Exception e) {
+                String errorMessage = "Error loading opportunity";
+                if (e.getMessage() != null) {
+                    errorMessage += ": " + e.getMessage();
+                }
                 Toast.makeText(OpportunityDetailsActivity.this,
-                    "Error loading opportunity: " + e.getMessage(),
+                    errorMessage,
                     Toast.LENGTH_SHORT).show();
+                finish();
             }
         });
     }
 
     private void updateUI() {
+        if (opportunity == null) return;
+
         titleText.setText(opportunity.getTitle());
         organizationText.setText(opportunity.getOrganization());
         locationText.setText(opportunity.getLocation());
@@ -128,6 +160,7 @@ public class OpportunityDetailsActivity extends AppCompatActivity {
             Glide.with(this)
                 .load(opportunity.getImageUrl())
                 .placeholder(R.drawable.placeholder_image)
+                .error(R.drawable.placeholder_image)
                 .into(opportunityImage);
         }
     }
@@ -159,8 +192,12 @@ public class OpportunityDetailsActivity extends AppCompatActivity {
 
             @Override
             public void onError(Exception e) {
+                String errorMessage = "Error submitting application";
+                if (e.getMessage() != null) {
+                    errorMessage += ": " + e.getMessage();
+                }
                 Toast.makeText(OpportunityDetailsActivity.this, 
-                    "Error submitting application: " + e.getMessage(),
+                    errorMessage,
                     Toast.LENGTH_SHORT).show();
             }
         });

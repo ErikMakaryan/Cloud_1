@@ -93,6 +93,13 @@
 
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/date_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textSize="14sp" />
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView> 

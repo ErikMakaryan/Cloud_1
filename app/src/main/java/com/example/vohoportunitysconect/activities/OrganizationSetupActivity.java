@@ -11,7 +11,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.vohoportunitysconect.R;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class OrganizationSetupActivity extends AppCompatActivity {
     private TextInputLayout nameInput;
@@ -21,7 +25,7 @@ public class OrganizationSetupActivity extends AppCompatActivity {
     private TextInputLayout addressInput;
     private Button completeButton;
     private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    private DatabaseReference dbRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,7 +34,7 @@ public class OrganizationSetupActivity extends AppCompatActivity {
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        dbRef = FirebaseDatabase.getInstance().getReference();
 
         // Initialize views
         nameInput = findViewById(R.id.organization_name_input);
@@ -59,25 +63,25 @@ public class OrganizationSetupActivity extends AppCompatActivity {
         String userId = mAuth.getCurrentUser().getUid();
 
         // Update user profile with organization details
-        db.collection("users").document(userId)
-                .update(
-                    "organizationName", name,
-                    "organizationDescription", description,
-                    "organizationWebsite", website,
-                    "phoneNumber", phone,
-                    "location", address
-                )
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(OrganizationSetupActivity.this,
-                            "Organization profile created successfully",
-                            Toast.LENGTH_SHORT).show();
-                    startActivity(new Intent(OrganizationSetupActivity.this, MainActivity.class));
-                    finish();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(OrganizationSetupActivity.this,
-                            "Error creating organization profile: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
-                });
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("organizationName", name);
+        updates.put("organizationDescription", description);
+        updates.put("organizationWebsite", website);
+        updates.put("phoneNumber", phone);
+        updates.put("location", address);
+        
+        dbRef.child("users").child(userId).updateChildren(updates)
+            .addOnSuccessListener(aVoid -> {
+                Toast.makeText(OrganizationSetupActivity.this,
+                        "Organization profile created successfully",
+                        Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(OrganizationSetupActivity.this, MainActivity.class));
+                finish();
+            })
+            .addOnFailureListener(e -> {
+                Toast.makeText(OrganizationSetupActivity.this,
+                        "Error creating organization profile: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            });
     }
 } 

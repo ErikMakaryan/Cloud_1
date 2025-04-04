@@ -16,9 +16,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.vohoportunitysconect.MainActivity;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.VOHApplication;
+import com.example.vohoportunitysconect.firebase.FirebaseManager;
+import com.example.vohoportunitysconect.models.UserType;
+import com.google.firebase.auth.ActionCodeSettings;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.UserProfileChangeRequest;
 import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +50,10 @@ public class SignUpActivity extends AppCompatActivity {
 
         // Initialize Firebase
         firebaseAuth = FirebaseAuth.getInstance();
-        databaseRef = FirebaseAuth.getInstance().getDatabase().getReference();
+        databaseRef = FirebaseDatabase.getInstance("https://vohoportunitysconect-default-rtdb.firebaseio.com").getReference();
+        
+        // Initialize FirebaseManager
+        FirebaseManager.getInstance().initialize(this);
 
         // Initialize views
         initializeViews();
@@ -72,68 +81,80 @@ public class SignUpActivity extends AppCompatActivity {
         String email = emailInput.getText().toString().trim();
         String password = passwordInput.getText().toString().trim();
         String confirmPassword = confirmPasswordInput.getText().toString().trim();
-        String userType = userTypeGroup.getCheckedRadioButtonId() == R.id.volunteer_radio ? "volunteer" : "organization";
+        String userTypeValue = userTypeGroup.getCheckedRadioButtonId() == R.id.volunteer_radio ? 
+            UserType.VOLUNTEER.getValue() : UserType.ORGANIZATION.getValue();
 
         if (validateInput(name, email, password, confirmPassword)) {
             showLoading(true);
-            firebaseAuth.createUserWithEmailAndPassword(email, password)
-                    .addOnCompleteListener(this, task -> {
-                        if (task.isSuccessful()) {
-                            // Update user profile
-                            UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
-                                    .setDisplayName(name)
-                                    .build();
-
-                            task.getResult().getUser().updateProfile(profileUpdates)
-                                    .addOnCompleteListener(profileTask -> {
-                                        if (profileTask.isSuccessful()) {
-                                            // Save user data to Realtime Database
-                                            saveUserToFirestore(task.getResult().getUser().getUid(), name, email, userType);
-                                        } else {
-                                            showLoading(false);
-                                            Log.e(TAG, "Error updating profile", profileTask.getException());
-                                            Toast.makeText(SignUpActivity.this,
-                                                    "Error updating profile: " + profileTask.getException().getMessage(),
-                                                    Toast.LENGTH_SHORT).show();
-                                        }
-                                    });
-                        } else {
-                            showLoading(false);
-                            Log.e(TAG, "Sign up failed", task.getException());
-                            Toast.makeText(SignUpActivity.this,
-                                    "Sign up failed: " + task.getException().getMessage(),
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    });
+            
+            // Try to create the user directly
+            createNewUser(email, password, name, userTypeValue);
         }
     }
 
-    private void saveUserToFirestore(String userId, String name, String email, String userType) {
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("name", name);
-        userData.put("email", email);
-        userData.put("userType", userType);
-        userData.put("createdAt", System.currentTimeMillis());
+    private void createNewUser(String email, String password, String name, String userTypeValue) {
+        firebaseAuth.createUserWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    // Update user profile
+                    UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+                            .setDisplayName(name)
+                            .build();
 
-        databaseRef.child("users").child(userId).setValue(userData)
-                .addOnSuccessListener(aVoid -> {
-                    // Save user data to local preferences
-                    VOHApplication.getInstance().getDataManager()
-                            .saveUserData(userId, email, name);
-                    VOHApplication.getInstance().getDataManager()
-                            .saveUserType(userType);
-                    // Save password for persistent sign-in
-                    VOHApplication.getInstance().getDataManager()
-                            .saveCurrentUserPassword(passwordInput.getText().toString().trim());
-                    navigateToMain();
-                })
-                .addOnFailureListener(e -> {
+                    task.getResult().getUser().updateProfile(profileUpdates)
+                            .addOnCompleteListener(profileTask -> {
+                                if (profileTask.isSuccessful()) {
+                                    // Save user data to Realtime Database
+                                    saveUserToDatabase(task.getResult().getUser().getUid(), name, email, userTypeValue);
+                                } else {
+                                    showLoading(false);
+                                    Log.e(TAG, "Error updating profile", profileTask.getException());
+                                    Toast.makeText(SignUpActivity.this,
+                                            "Error updating profile: " + profileTask.getException().getMessage(),
+                                            Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                } else {
                     showLoading(false);
-                    Log.e(TAG, "Error saving user data", e);
-                    Toast.makeText(SignUpActivity.this,
-                            "Error saving user data: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
-                });
+                    Log.e(TAG, "Sign up failed", task.getException());
+                    String errorMessage = "Sign up failed. Please try again.";
+                    if (task.getException() instanceof FirebaseAuthUserCollisionException) {
+                        // Email is already in use
+                        new MaterialAlertDialogBuilder(this)
+                            .setTitle("Email Already Registered")
+                            .setMessage("This email is already registered. Would you like to log in instead?")
+                            .setPositiveButton("Log In", (dialog, which) -> {
+                                Intent intent = new Intent(SignUpActivity.this, LoginActivity.class);
+                                intent.putExtra("email", email);
+                                startActivity(intent);
+                                finish();
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                    } else {
+                        Toast.makeText(SignUpActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
+    }
+
+    private void saveUserToDatabase(String userId, String name, String email, String userType) {
+        FirebaseManager.getInstance().createUserProfile(userId, name, email, userType)
+            .addOnSuccessListener(aVoid -> {
+                // Save user data to local preferences
+                VOHApplication.getInstance().getDataManager()
+                        .saveUserData(userId, email, name);
+                VOHApplication.getInstance().getDataManager()
+                        .saveUserType(userType);
+                navigateToMain();
+            })
+            .addOnFailureListener(e -> {
+                showLoading(false);
+                Log.e(TAG, "Error saving user data", e);
+                Toast.makeText(SignUpActivity.this,
+                        "Error saving user data: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            });
     }
 
     private boolean validateInput(String name, String email, String password, String confirmPassword) {
