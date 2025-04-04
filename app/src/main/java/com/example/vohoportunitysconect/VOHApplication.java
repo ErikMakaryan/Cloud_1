@@ -11,6 +11,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.example.vohoportunitysconect.BuildConfig;
+import com.example.vohoportunitysconect.database.DatabaseManager;
 
 public class VOHApplication extends Application {
     private static final String TAG = "VOHApplication";
@@ -27,7 +28,9 @@ public class VOHApplication extends Application {
         
         try {
             // Initialize Firebase
-            FirebaseApp.initializeApp(this);
+            if (FirebaseApp.getApps(this).isEmpty()) {
+                FirebaseApp.initializeApp(this);
+            }
             
             // Enable Firebase persistence
             FirebaseDatabase.getInstance().setPersistenceEnabled(true);
@@ -35,6 +38,9 @@ public class VOHApplication extends Application {
             // Initialize FirebaseManager first
             firebaseManager = FirebaseManager.getInstance();
             firebaseManager.initialize(this);
+            
+            // Initialize DatabaseManager
+            DatabaseManager.getInstance();
             
             // Initialize executor service
             executorService = Executors.newFixedThreadPool(4);
@@ -51,8 +57,7 @@ public class VOHApplication extends Application {
             Log.d(TAG, "Application initialized successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error initializing application: " + e.getMessage(), e);
-            // Don't throw the exception, just log it
-            // This prevents the app from crashing during initialization
+            isInitialized = false;
         }
     }
 

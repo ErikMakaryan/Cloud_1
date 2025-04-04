@@ -59,6 +59,10 @@ public class CreateOpportunityActivity extends AppCompatActivity {
         requirementsInput = findViewById(R.id.requirements_input);
         compensationInput = findViewById(R.id.compensation_input);
         createButton = findViewById(R.id.create_button);
+        
+        // Initialize return button
+        MaterialButton returnButton = findViewById(R.id.return_button);
+        returnButton.setOnClickListener(v -> finish());
     }
 
     private void setupClickListeners() {

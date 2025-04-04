@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -105,6 +106,8 @@ public class MainActivity extends AppCompatActivity {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
             Log.e(TAG, "No current user");
+            nameTextView.setText(getString(R.string.anonymous_user));
+            emailTextView.setText(getString(R.string.no_email));
             return;
         }
 
@@ -116,6 +119,13 @@ public class MainActivity extends AppCompatActivity {
         String userId = currentUser.getUid();
         Log.d(TAG, "Attempting to load user data for ID: " + userId);
         
+        // Check if database reference is initialized
+        if (databaseManager == null) {
+            Log.e(TAG, "DatabaseManager is not initialized");
+            nameTextView.setText(getString(R.string.anonymous_user));
+            return;
+        }
+
         databaseManager.getUser(userId, new DatabaseManager.DatabaseCallback<User>() {
             @Override
             public void onSuccess(User user) {
@@ -123,14 +133,18 @@ public class MainActivity extends AppCompatActivity {
                 if (user != null && user.getName() != null) {
                     nameTextView.setText(user.getName());
                 } else {
+                    Log.e(TAG, "User data is null or name is missing");
                     nameTextView.setText(getString(R.string.anonymous_user));
                 }
             }
 
             @Override
             public void onError(Exception e) {
-                Log.e(TAG, "Error loading user data: " + e.getMessage());
+                Log.e(TAG, "Error loading user data: " + e.getMessage(), e);
                 nameTextView.setText(getString(R.string.anonymous_user));
+                Toast.makeText(MainActivity.this, 
+                    "Error loading user data. Please try again later.", 
+                    Toast.LENGTH_SHORT).show();
             }
         });
     }

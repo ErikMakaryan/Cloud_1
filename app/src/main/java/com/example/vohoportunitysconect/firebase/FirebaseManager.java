@@ -18,6 +18,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.database.DatabaseError;
+import com.google.firebase.FirebaseApp;
 
 public class FirebaseManager {
     private static final String TAG = "FirebaseManager";
@@ -54,8 +55,14 @@ public class FirebaseManager {
         }
 
         try {
+            // Wait for FirebaseApp to be initialized
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                Log.e(TAG, "FirebaseApp not initialized");
+                return;
+            }
+
             // Initialize Firebase Database with persistence
-            database = FirebaseDatabase.getInstance("https://vohoportunitysconect-default-rtdb.firebaseio.com");
+            database = FirebaseDatabase.getInstance();
             database.setPersistenceEnabled(true);
             dbRef = database.getReference();
             
@@ -76,6 +83,7 @@ public class FirebaseManager {
             Log.d(TAG, "FirebaseManager initialized successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error initializing FirebaseManager: " + e.getMessage(), e);
+            isInitialized = false;
         }
     }
 
@@ -345,7 +353,17 @@ public class FirebaseManager {
     }
 
     public void getUserData(String userId, ValueEventListener listener) {
-        checkInitialization();
+        if (!isInitialized) {
+            Log.e(TAG, "FirebaseManager not initialized");
+            listener.onCancelled(DatabaseError.fromException(new Exception("FirebaseManager not initialized")));
+            return;
+        }
+        
+        if (userId == null || userId.trim().isEmpty()) {
+            Log.e(TAG, "Invalid user ID");
+            listener.onCancelled(DatabaseError.fromException(new Exception("Invalid user ID")));
+            return;
+        }
         
         // Check cache first
         if (userDataCache.containsKey(userId)) {
@@ -361,14 +379,20 @@ public class FirebaseManager {
         dbRef.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (dataSnapshot.exists()) {
-                    userDataCache.put(userId, dataSnapshot);
+                try {
+                    if (dataSnapshot.exists()) {
+                        userDataCache.put(userId, dataSnapshot);
+                    }
+                    listener.onDataChange(dataSnapshot);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error processing user data: " + e.getMessage(), e);
+                    listener.onCancelled(DatabaseError.fromException(e));
                 }
-                listener.onDataChange(dataSnapshot);
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e(TAG, "Error fetching user data: " + databaseError.getMessage());
                 listener.onCancelled(databaseError);
             }
         });

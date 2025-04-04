@@ -16,6 +16,7 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.appcheck.FirebaseAppCheck;
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory;
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
+import com.google.android.gms.tasks.OnCompleteListener;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,14 +41,14 @@ public class DatabaseManager {
     }
 
     private DatabaseManager() {
-        // Initialize Firebase components
-        FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
-        databaseRef = firebaseDatabase.getReference();
-        mAuth = FirebaseAuth.getInstance();
-        firebaseAppCheck = FirebaseAppCheck.getInstance();
-        activeListeners = new HashMap<>();
-
         try {
+            // Initialize Firebase components
+            FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
+            databaseRef = firebaseDatabase.getReference();
+            mAuth = FirebaseAuth.getInstance();
+            firebaseAppCheck = FirebaseAppCheck.getInstance();
+            activeListeners = new HashMap<>();
+
             // Configure App Check based on build type
             if (BuildConfig.DEBUG) {
                 firebaseAppCheck.installAppCheckProviderFactory(
@@ -58,9 +59,30 @@ public class DatabaseManager {
                     PlayIntegrityAppCheckProviderFactory.getInstance()
                 );
             }
-            isInitialized = true;
+
+            // Test database connection
+            databaseRef.child(".info/connected").addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    boolean connected = snapshot.getValue(Boolean.class);
+                    if (connected) {
+                        Log.d(TAG, "Database connected successfully");
+                        isInitialized = true;
+                    } else {
+                        Log.e(TAG, "Database disconnected");
+                        isInitialized = false;
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Log.e(TAG, "Database connection error: " + error.getMessage());
+                    isInitialized = false;
+                }
+            });
         } catch (Exception e) {
-            Log.e(TAG, "Error initializing Firebase components: " + e.getMessage());
+            Log.e(TAG, "Error initializing DatabaseManager: " + e.getMessage(), e);
+            isInitialized = false;
         }
     }
 
@@ -166,31 +188,51 @@ public class DatabaseManager {
     }
 
     public void getUser(String userId, DatabaseCallback<User> callback) {
-        checkAuthentication(callback, () -> {
-            databaseRef.child("users").child(userId)
-                    .addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
-                            if (snapshot.exists()) {
-                                User user = snapshot.getValue(User.class);
+        if (!isInitialized) {
+            Log.e(TAG, "DatabaseManager not initialized");
+            callback.onError(new Exception("Database not initialized"));
+            return;
+        }
+
+        if (userId == null || userId.trim().isEmpty()) {
+            Log.e(TAG, "Invalid user ID");
+            callback.onError(new Exception("Invalid user ID"));
+            return;
+        }
+
+        try {
+            databaseRef.child("users").child(userId).get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        DataSnapshot dataSnapshot = task.getResult();
+                        if (dataSnapshot != null && dataSnapshot.exists()) {
+                            try {
+                                User user = dataSnapshot.getValue(User.class);
                                 if (user != null) {
                                     user.setId(userId);
+                                    Log.d(TAG, "User data retrieved successfully");
                                     callback.onSuccess(user);
                                 } else {
+                                    Log.e(TAG, "Failed to parse user data");
                                     callback.onError(new Exception("Failed to parse user data"));
                                 }
-                            } else {
-                                callback.onError(new Exception("User not found"));
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing user data: " + e.getMessage());
+                                callback.onError(e);
                             }
+                        } else {
+                            Log.e(TAG, "User not found");
+                            callback.onError(new Exception("User not found"));
                         }
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-                            Log.e(TAG, "Error loading user data: " + error.getMessage());
-                            callback.onError(new Exception(error.getMessage()));
-                        }
-                    });
-        });
+                    } else {
+                        Log.e(TAG, "Error getting user data: " + task.getException().getMessage());
+                        callback.onError(task.getException());
+                    }
+                });
+        } catch (Exception e) {
+            Log.e(TAG, "Exception getting user data: " + e.getMessage());
+            callback.onError(e);
+        }
     }
 
     // Opportunity operations

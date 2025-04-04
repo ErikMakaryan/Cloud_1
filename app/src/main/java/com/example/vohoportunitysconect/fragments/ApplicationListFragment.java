@@ -1,6 +1,7 @@
 package com.example.vohoportunitysconect.fragments;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +17,7 @@ import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.adapters.ApplicationAdapter;
 import com.example.vohoportunitysconect.models.Application;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -34,6 +36,7 @@ public class ApplicationListFragment extends Fragment {
     private DatabaseReference databaseRef;
     private FirebaseAuth auth;
     private Application.Status status;
+    private ValueEventListener valueEventListener;
 
     public static ApplicationListFragment newInstance(Application.Status status) {
         ApplicationListFragment fragment = new ApplicationListFragment();
@@ -64,7 +67,7 @@ public class ApplicationListFragment extends Fragment {
 
     private void initializeViews(View view) {
         recyclerView = view.findViewById(R.id.applications_recycler);
-        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+        databaseRef = FirebaseDatabase.getInstance("https://vohoportunitysconect-default-rtdb.firebaseio.com").getReference();
         auth = FirebaseAuth.getInstance();
         applications = new ArrayList<>();
     }
@@ -79,30 +82,63 @@ public class ApplicationListFragment extends Fragment {
     }
 
     private void loadApplications() {
-        String userId = auth.getCurrentUser().getUid();
+        FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(getContext(), "Please sign in to view applications", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String userId = currentUser.getUid();
         Query applicationsQuery = databaseRef.child("applications")
                 .orderByChild("userId")
                 .equalTo(userId);
 
-        applicationsQuery.addValueEventListener(new ValueEventListener() {
+        // Remove existing listener if any
+        if (valueEventListener != null) {
+            applicationsQuery.removeEventListener(valueEventListener);
+        }
+
+        valueEventListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (!isAdded() || getContext() == null) return;
+                
                 applications.clear();
                 for (DataSnapshot applicationSnapshot : dataSnapshot.getChildren()) {
-                    Application application = applicationSnapshot.getValue(Application.class);
-                    if (application != null && application.getStatusEnum() == status) {
-                        application.setId(applicationSnapshot.getKey());
-                        applications.add(application);
+                    try {
+                        Application application = applicationSnapshot.getValue(Application.class);
+                        if (application != null && application.getStatusEnum() == status) {
+                            application.setId(applicationSnapshot.getKey());
+                            applications.add(application);
+                        }
+                    } catch (Exception e) {
+                        Log.e("ApplicationList", "Error parsing application: " + e.getMessage());
                     }
                 }
-                adapter.notifyDataSetChanged();
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                Toast.makeText(getContext(), "Error loading applications: " + databaseError.getMessage(),
-                        Toast.LENGTH_SHORT).show();
+                if (!isAdded() || getContext() == null) return;
+                Toast.makeText(getContext(), 
+                    "Error loading applications: " + databaseError.getMessage(),
+                    Toast.LENGTH_SHORT).show();
+                Log.e("ApplicationList", "Database error: " + databaseError.getMessage());
             }
-        });
+        };
+
+        applicationsQuery.addValueEventListener(valueEventListener);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (databaseRef != null && valueEventListener != null) {
+            databaseRef.removeEventListener(valueEventListener);
+            valueEventListener = null;
+        }
     }
 } 
