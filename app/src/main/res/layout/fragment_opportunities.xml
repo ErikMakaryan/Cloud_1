@@ -1,52 +1,108 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/swipe_refresh"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <androidx.appcompat.widget.SearchView
-        android:id="@+id/search_view"
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:background="@drawable/search_background"
-        android:elevation="2dp"
-        app:iconifiedByDefault="false"
-        app:queryHint="Search opportunities" />
+        android:layout_height="match_parent">
 
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/filter_chip_group"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="16dp"
-        app:singleSelection="false">
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/search_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:background="@drawable/search_background"
+            android:elevation="2dp"
+            app:iconifiedByDefault="false"
+            app:queryHint=""
+            app:layout_constraintTop_toTopOf="parent" />
 
-        <com.google.android.material.chip.Chip
-            android:id="@+id/chip_remote"
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/filter_chip_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="8dp"
+            app:singleSelection="false"
+            app:layout_constraintTop_toBottomOf="@id/search_view">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_remote"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remote"
+                app:chipBackgroundColor="@color/chip_background"
+                app:chipIcon="@drawable/ic_remote" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_featured"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Featured"
+                app:chipBackgroundColor="@color/chip_background"
+                app:chipIcon="@drawable/ic_star" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_urgent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Urgent"
+                app:chipBackgroundColor="@color/chip_background"
+                app:chipIcon="@drawable/ic_urgent" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/opportunities_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:clipToPadding="false"
+            android:padding="8dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/filter_chip_group" />
+
+        <LinearLayout
+            android:id="@+id/error_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Remote"
-            app:chipBackgroundColor="@color/chip_background"
-            app:chipIcon="@drawable/ic_remote" />
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-        <com.google.android.material.chip.Chip
-            android:id="@+id/chip_featured"
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_warning"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/empty_state_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Error connecting to database"
+                android:textSize="12sp"
+                android:textColor="#FFC107"
+                android:gravity="center"/>
+
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/loading_progress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Featured"
-            app:chipBackgroundColor="@color/chip_background"
-            app:chipIcon="@drawable/ic_star" />
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    </com.google.android.material.chip.ChipGroup>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/opportunities_recycler"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:padding="8dp" />
-
-</LinearLayout> 
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout> 

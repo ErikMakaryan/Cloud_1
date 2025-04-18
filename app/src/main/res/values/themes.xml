@@ -14,12 +14,22 @@
         <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.App.SmallComponent</item>
         <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.App.MediumComponent</item>
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.App.LargeComponent</item>
+        <!-- App icon -->
+        <item name="android:icon">@drawable/ic_heart_white</item>
+        <item name="android:roundIcon">@drawable/ic_heart_white</item>
     </style>
 
     <!-- Main application theme -->
     <style name="Theme.VOHoportunitysconect" parent="Base.Theme.VOHoportunitysconect">
         <item name="windowActionBar">true</item>
         <item name="windowNoTitle">false</item>
+        <item name="actionBarStyle">@style/AppActionBar</item>
+    </style>
+
+    <!-- Action Bar style -->
+    <style name="AppActionBar" parent="Widget.MaterialComponents.ActionBar.Solid">
+        <item name="android:icon">@drawable/ic_heart_white</item>
+        <item name="icon">@drawable/ic_heart_white</item>
     </style>
 
     <!-- No Action Bar theme -->

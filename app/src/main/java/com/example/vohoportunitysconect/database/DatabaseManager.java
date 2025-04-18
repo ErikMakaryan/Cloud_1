@@ -25,10 +25,10 @@ import java.util.Map;
 public class DatabaseManager {
     private static final String TAG = "DatabaseManager";
     private static volatile DatabaseManager instance;
-    private final DatabaseReference databaseRef;
-    private final FirebaseAuth mAuth;
-    private final FirebaseAppCheck firebaseAppCheck;
-    private final Map<String, ValueEventListener> activeListeners;
+    private DatabaseReference databaseRef;
+    private FirebaseAuth mAuth;
+    private FirebaseAppCheck firebaseAppCheck;
+    private Map<String, ValueEventListener> activeListeners;
     private boolean isInitialized = false;
 
     static {

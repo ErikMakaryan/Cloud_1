@@ -47,6 +47,7 @@ public class Opportunity {
     private boolean isRemote;
     private int requiredHours;
     private boolean featured;
+    private boolean urgent;
     private Difficulty difficulty;
     private int maxVolunteers;
     private int currentVolunteers;
@@ -200,6 +201,14 @@ public class Opportunity {
 
     public void setFeatured(boolean featured) {
         this.featured = featured;
+    }
+
+    public boolean isUrgent() {
+        return urgent;
+    }
+
+    public void setUrgent(boolean urgent) {
+        this.urgent = urgent;
     }
 
     public Difficulty getDifficulty() {
