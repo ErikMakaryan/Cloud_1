@@ -9,20 +9,14 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.models.Opportunity;
-import com.google.android.material.chip.Chip;
 
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.OpportunityViewHolder> {
-    private List<Opportunity> opportunities;
+    private final List<Opportunity> opportunities;
     private final OnOpportunityClickListener listener;
-    private final SimpleDateFormat dateFormat;
 
     public interface OnOpportunityClickListener {
         void onOpportunityClick(Opportunity opportunity);
@@ -31,7 +25,6 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
     public OpportunityAdapter(List<Opportunity> opportunities, OnOpportunityClickListener listener) {
         this.opportunities = opportunities;
         this.listener = listener;
-        this.dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
     }
 
     public void updateOpportunities(List<Opportunity> newOpportunities) {
@@ -47,13 +40,13 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
     public OpportunityViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_opportunity, parent, false);
-        return new OpportunityViewHolder(view, dateFormat);
+        return new OpportunityViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull OpportunityViewHolder holder, int position) {
         Opportunity opportunity = opportunities.get(position);
-        holder.bind(opportunity, listener);
+        holder.bind(opportunity);
     }
 
     @Override
@@ -64,41 +57,40 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
     class OpportunityViewHolder extends RecyclerView.ViewHolder {
         private final TextView titleText;
         private final TextView organizationText;
-        private final TextView descriptionText;
-        private final Chip locationChip;
-        private final Chip difficultyChip;
-        private final Chip deadlineChip;
-        private final Chip categoryChip;
-        private final Chip skillsChip;
-        private final TextView dateText;
-        private final SimpleDateFormat dateFormat;
+        private final TextView locationText;
+        private final TextView categoryText;
+        private final ImageView urgentIndicator;
+        private final ImageView remoteIndicator;
+        private final ImageView featuredIndicator;
 
-        public OpportunityViewHolder(@NonNull View itemView, SimpleDateFormat dateFormat) {
+        OpportunityViewHolder(@NonNull View itemView) {
             super(itemView);
-            this.dateFormat = dateFormat;
             titleText = itemView.findViewById(R.id.opportunity_title);
-            organizationText = itemView.findViewById(R.id.organization_name);
-            descriptionText = itemView.findViewById(R.id.opportunity_description);
-            locationChip = itemView.findViewById(R.id.location_chip);
-            difficultyChip = itemView.findViewById(R.id.difficulty_chip);
-            deadlineChip = itemView.findViewById(R.id.deadline_chip);
-            categoryChip = itemView.findViewById(R.id.category_chip);
-            skillsChip = itemView.findViewById(R.id.skills_chip);
-            dateText = itemView.findViewById(R.id.date_text);
+            organizationText = itemView.findViewById(R.id.opportunity_organization);
+            locationText = itemView.findViewById(R.id.opportunity_location);
+            categoryText = itemView.findViewById(R.id.opportunity_category);
+            urgentIndicator = itemView.findViewById(R.id.urgent_indicator);
+            remoteIndicator = itemView.findViewById(R.id.remote_indicator);
+            featuredIndicator = itemView.findViewById(R.id.featured_indicator);
+
+            itemView.setOnClickListener(v -> {
+                int position = getBindingAdapterPosition();
+                if (position != RecyclerView.NO_POSITION) {
+                    listener.onOpportunityClick(opportunities.get(position));
+                }
+            });
         }
 
-        public void bind(Opportunity opportunity, OnOpportunityClickListener listener) {
+        void bind(Opportunity opportunity) {
             titleText.setText(opportunity.getTitle());
             organizationText.setText(opportunity.getOrganization());
-            descriptionText.setText(opportunity.getDescription());
-            locationChip.setText(opportunity.getLocation());
-            difficultyChip.setText(opportunity.getDifficulty().toString());
-            deadlineChip.setText(dateFormat.format(opportunity.getDeadline()));
-            categoryChip.setText(opportunity.getCategory());
-            skillsChip.setText(opportunity.getSkills());
-            dateText.setText(dateFormat.format(opportunity.getDate()));
+            locationText.setText(opportunity.getLocation());
+            categoryText.setText(opportunity.getCategory());
 
-            itemView.setOnClickListener(v -> listener.onOpportunityClick(opportunity));
+            // Set indicators visibility
+            urgentIndicator.setVisibility(opportunity.isUrgent() ? View.VISIBLE : View.GONE);
+            remoteIndicator.setVisibility(opportunity.isRemote() ? View.VISIBLE : View.GONE);
+            featuredIndicator.setVisibility(opportunity.isFeatured() ? View.VISIBLE : View.GONE);
         }
     }
 } 

@@ -1,17 +1,23 @@
 package com.example.vohoportunitysconect.ui.opportunities;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.SearchView;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -49,6 +55,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
     private Chip urgentChip;
     private String currentCategory = "";
 
+    @SuppressLint("SetTextI18n")
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_opportunities, container, false);
@@ -65,7 +72,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
         
         // Initialize RecyclerView
         opportunitiesRecycler = root.findViewById(R.id.opportunities_recycler);
-        opportunitiesRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
+        opportunitiesRecycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         opportunityAdapter = new OpportunityAdapter(filteredOpportunities, this);
         opportunitiesRecycler.setAdapter(opportunityAdapter);
         
@@ -91,7 +98,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
             }
             
             // Initialize Firebase Database with error handling
-            FirebaseDatabase database = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com");
+            FirebaseDatabase database = FirebaseDatabase.getInstance();
             database.setPersistenceEnabled(true);
             
             // Get reference and enable offline persistence
@@ -186,7 +193,8 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
                         
                         filteredOpportunities.clear();
                         filteredOpportunities.addAll(opportunities);
-                        applyFilters();
+                        opportunityAdapter.notifyDataSetChanged();
+                        updateEmptyState();
                         
                         Log.d(TAG, "Successfully loaded " + opportunities.size() + " opportunities");
                     } catch (Exception e) {
@@ -249,28 +257,41 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
 
     @SuppressLint("NotifyDataSetChanged")
     private void applyFilters() {
-        if (getActivity() == null || opportunityAdapter == null) return;
+        if (getActivity() == null || opportunityAdapter == null || searchView == null || 
+            remoteChip == null || featuredChip == null || urgentChip == null) {
+            return;
+        }
         
-        String searchQuery = searchView.getQuery().toString().toLowerCase(Locale.getDefault());
+        CharSequence query = searchView.getQuery();
+        String searchQuery = query != null ? query.toString().toLowerCase(Locale.getDefault()) : "";
         boolean isRemoteSelected = remoteChip.isChecked();
         boolean isFeaturedSelected = featuredChip.isChecked();
         boolean isUrgentSelected = urgentChip.isChecked();
 
         List<Opportunity> newFilteredList = new ArrayList<>();
         for (Opportunity opportunity : opportunities) {
+            if (opportunity == null) continue;
+            
             boolean matchesSearch = true;
             
             // Handle category search
             if (!currentCategory.isEmpty()) {
-                matchesSearch = opportunity.getCategory().toLowerCase(Locale.getDefault())
-                    .contains(currentCategory);
+                String category = opportunity.getCategory();
+                matchesSearch = category != null && 
+                    category.toLowerCase(Locale.getDefault()).contains(currentCategory);
             } else if (!searchQuery.isEmpty()) {
                 // Regular search
-                matchesSearch = opportunity.getTitle().toLowerCase(Locale.getDefault()).contains(searchQuery) ||
-                    opportunity.getOrganization().toLowerCase(Locale.getDefault()).contains(searchQuery) ||
-                    opportunity.getDescription().toLowerCase(Locale.getDefault()).contains(searchQuery) ||
-                    opportunity.getLocation().toLowerCase(Locale.getDefault()).contains(searchQuery) ||
-                    opportunity.getCategory().toLowerCase(Locale.getDefault()).contains(searchQuery);
+                String title = opportunity.getTitle();
+                String organization = opportunity.getOrganization();
+                String description = opportunity.getDescription();
+                String location = opportunity.getLocation();
+                String category = opportunity.getCategory();
+                
+                matchesSearch = (title != null && title.toLowerCase(Locale.getDefault()).contains(searchQuery)) ||
+                    (organization != null && organization.toLowerCase(Locale.getDefault()).contains(searchQuery)) ||
+                    (description != null && description.toLowerCase(Locale.getDefault()).contains(searchQuery)) ||
+                    (location != null && location.toLowerCase(Locale.getDefault()).contains(searchQuery)) ||
+                    (category != null && category.toLowerCase(Locale.getDefault()).contains(searchQuery));
             }
 
             boolean matchesFilters = true;
@@ -289,12 +310,15 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
             }
         }
 
-        getActivity().runOnUiThread(() -> {
-            filteredOpportunities.clear();
-            filteredOpportunities.addAll(newFilteredList);
-            opportunityAdapter.notifyDataSetChanged();
-            updateEmptyState();
-        });
+        Activity activity = getActivity();
+        if (activity != null) {
+            activity.runOnUiThread(() -> {
+                filteredOpportunities.clear();
+                filteredOpportunities.addAll(newFilteredList);
+                opportunityAdapter.notifyDataSetChanged();
+                updateEmptyState();
+            });
+        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -321,14 +345,23 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
 
     @Override
     public void onOpportunityClick(Opportunity opportunity) {
+        if (opportunity == null || !isAdded() || getView() == null) {
+            return;
+        }
+        
         try {
             Bundle args = new Bundle();
             args.putString("opportunityId", opportunity.getId());
-            Navigation.findNavController(requireView())
-                .navigate(R.id.action_opportunitiesFragment_to_opportunityDetailsFragment, args);
+            NavController navController = Navigation.findNavController(getView());
+            if (navController != null) {
+                navController.navigate(R.id.action_opportunitiesFragment_to_opportunityDetailsFragment, args);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error navigating to details: " + e.getMessage(), e);
-            Toast.makeText(getContext(), "Error opening opportunity details", Toast.LENGTH_SHORT).show();
+            Context context = getContext();
+            if (context != null) {
+                Toast.makeText(context, "Error opening opportunity details", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 } 
