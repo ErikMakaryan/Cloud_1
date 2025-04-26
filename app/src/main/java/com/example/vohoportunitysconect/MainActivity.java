@@ -36,6 +36,8 @@ import com.bumptech.glide.Glide;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+import com.example.vohoportunitysconect.databinding.ActivityMainBinding;
+
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "MainActivity";
     private static final String PREF_NAME = "VOHPrefs";
@@ -51,50 +53,68 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private ActionBarDrawerToggle toggle;
     private SharedPreferences sharedPreferences;
 
+    private ActivityMainBinding binding;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        try {
-            setContentView(R.layout.activity_main);
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
-            // Initialize SharedPreferences
-            sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        // Initialize SharedPreferences
+        sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
 
-            mAuth = FirebaseAuth.getInstance();
-            FirebaseUser currentUser = mAuth.getCurrentUser();
-            
-            // Initialize views first
-            drawerLayout = findViewById(R.id.drawer_layout);
-            navigationView = findViewById(R.id.nav_view);
-            bottomNavigationView = findViewById(R.id.bottom_navigation);
-            
-            // Setup toolbar
-            Toolbar toolbar = findViewById(R.id.toolbar);
-            setSupportActionBar(toolbar);
+        mAuth = FirebaseAuth.getInstance();
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        
+        // Initialize views first
+        drawerLayout = binding.drawerLayout;
+        navigationView = binding.navView;
+        bottomNavigationView = binding.bottomNavigation;
+        
+        // Setup toolbar
+        Toolbar toolbar = binding.toolbar;
+        setSupportActionBar(toolbar);
 
-            // Initialize NavController
-            NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
-                    .findFragmentById(R.id.nav_host_fragment);
-            if (navHostFragment == null) {
-                throw new IllegalStateException("NavHostFragment not found");
-            }
-            navController = navHostFragment.getNavController();
-
-            // Check if user is signed in
-            if (currentUser == null) {
-                // Try to restore session
-                restoreUserSession();
-                return;
-            }
-
-            setupNavigation(toolbar);
-            updateNavigationHeader();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
-            Toast.makeText(this, "Error initializing app: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            redirectToLogin();
+        // Initialize NavController
+        NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.nav_host_fragment);
+        if (navHostFragment == null) {
+            throw new IllegalStateException("NavHostFragment not found");
         }
+        navController = navHostFragment.getNavController();
+
+        // Check if user is signed in
+        if (currentUser == null) {
+            // Try to restore session
+            restoreUserSession();
+            return;
+        }
+
+        setupNavigation(toolbar);
+        updateNavigationHeader();
+
+        // Setup Navigation
+        NavigationUI.setupWithNavController(binding.bottomNavigation, navController);
+
+        // Handle navigation item selection
+        binding.bottomNavigation.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.opportunitiesFragment) {
+                navController.navigate(R.id.opportunitiesFragment);
+                return true;
+            } else if (itemId == R.id.savedOpportunitiesFragment) {
+                navController.navigate(R.id.savedOpportunitiesFragment);
+                return true;
+            } else if (itemId == R.id.myApplicationsFragment) {
+                navController.navigate(R.id.myApplicationsFragment);
+                return true;
+            } else if (itemId == R.id.nav_profile) {
+                navController.navigate(R.id.nav_profile);
+                return true;
+            }
+            return false;
+        });
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -118,7 +138,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     .addOnCompleteListener(this, task -> {
                         if (task.isSuccessful()) {
                             Log.d(TAG, "Session restored successfully");
-                            setupNavigation(findViewById(R.id.toolbar));
+                            setupNavigation(binding.toolbar);
                             updateNavigationHeader();
                         } else {
                             Log.e(TAG, "Error restoring session", task.getException());

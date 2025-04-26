@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.models.Opportunity;
-import com.google.android.material.chip.Chip;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,6 +31,14 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
         this.listener = listener;
     }
 
+    public void updateOpportunities(List<Opportunity> newOpportunities) {
+        if (newOpportunities != null) {
+            this.opportunities.clear();
+            this.opportunities.addAll(newOpportunities);
+            notifyDataSetChanged();
+        }
+    }
+
     @NonNull
     @Override
     public OpportunityViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -43,18 +50,14 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
     @Override
     public void onBindViewHolder(@NonNull OpportunityViewHolder holder, int position) {
         Opportunity opportunity = opportunities.get(position);
-        holder.bind(opportunity);
+        if (opportunity != null) {
+            holder.bind(opportunity);
+        }
     }
 
     @Override
     public int getItemCount() {
         return opportunities.size();
-    }
-
-    public void setOpportunities(List<Opportunity> opportunities) {
-        this.opportunities.clear();
-        this.opportunities.addAll(opportunities);
-        notifyDataSetChanged();
     }
 
     class OpportunityViewHolder extends RecyclerView.ViewHolder {
@@ -65,9 +68,6 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
         private final ImageView urgentIndicator;
         private final ImageView remoteIndicator;
         private final ImageView featuredIndicator;
-        private final Chip difficultyChip;
-        private final Chip deadlineChip;
-        private final Chip skillsChip;
 
         OpportunityViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -78,12 +78,9 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
             urgentIndicator = itemView.findViewById(R.id.urgent_indicator);
             remoteIndicator = itemView.findViewById(R.id.remote_indicator);
             featuredIndicator = itemView.findViewById(R.id.featured_indicator);
-            difficultyChip = itemView.findViewById(R.id.difficulty_chip);
-            deadlineChip = itemView.findViewById(R.id.deadline_chip);
-            skillsChip = itemView.findViewById(R.id.skills_chip);
 
             itemView.setOnClickListener(v -> {
-                int position = getAdapterPosition();
+                int position = getBindingAdapterPosition();
                 if (position != RecyclerView.NO_POSITION) {
                     listener.onOpportunityClick(opportunities.get(position));
                 }
@@ -91,19 +88,18 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
         }
 
         void bind(Opportunity opportunity) {
-            titleText.setText(opportunity.getTitle());
-            organizationText.setText(opportunity.getOrganization());
-            locationText.setText(opportunity.getLocation());
-            categoryText.setText(opportunity.getCategory());
+            if (opportunity == null) return;
 
-            // Set indicators visibility
+            // Set text with null checks
+            titleText.setText(opportunity.getTitle() != null ? opportunity.getTitle() : "");
+            organizationText.setText(opportunity.getOrganization() != null ? opportunity.getOrganization() : "");
+            locationText.setText(opportunity.getLocation() != null ? opportunity.getLocation() : "");
+            categoryText.setText(opportunity.getCategory() != null ? opportunity.getCategory() : "");
+
+            // Set indicators visibility with null checks
             urgentIndicator.setVisibility(opportunity.isUrgent() ? View.VISIBLE : View.GONE);
             remoteIndicator.setVisibility(opportunity.isRemote() ? View.VISIBLE : View.GONE);
             featuredIndicator.setVisibility(opportunity.isFeatured() ? View.VISIBLE : View.GONE);
-
-            difficultyChip.setText(opportunity.getDifficulty().toString());
-            deadlineChip.setText(dateFormat.format(opportunity.getDeadline()));
-            skillsChip.setText(opportunity.getSkills());
         }
     }
 } 

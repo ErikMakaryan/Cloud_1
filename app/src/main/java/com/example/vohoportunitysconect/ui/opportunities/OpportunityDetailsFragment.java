@@ -4,40 +4,49 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 
-import com.bumptech.glide.Glide;
 import com.example.vohoportunitysconect.R;
-import com.example.vohoportunitysconect.database.DatabaseManager;
 import com.example.vohoportunitysconect.models.Opportunity;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 public class OpportunityDetailsFragment extends Fragment {
-    private static final String TAG = "OpportunityDetailsFragment";
-    private static final String ARG_OPPORTUNITY_ID = "opportunityId";
-
+    private static final String ARG_OPPORTUNITY_ID = "opportunity_id";
+    private String opportunityId;
     private TextView titleTextView;
-    private TextView descriptionTextView;
     private TextView organizationTextView;
     private TextView locationTextView;
-    private TextView dateTextView;
-    private TextView skillsTextView;
-    private ImageView imageView;
-    private Button applyButton;
-    private Button saveButton;
-    private ProgressBar progressBar;
-    private DatabaseManager databaseManager;
-    private FirebaseAuth mAuth;
-    private String opportunityId;
-    private Opportunity opportunity;
+    private TextView descriptionTextView;
+    private TextView requirementsTextView;
+    private TextView benefitsTextView;
+    private TextView deadlineTextView;
+    private ImageView urgentIndicator;
+    private Chip remoteChip;
+    private Chip featuredChip;
+    private FloatingActionButton saveFab;
+    private MaterialButton applyButton;
+    private DatabaseReference opportunityRef;
+    private DatabaseReference savedRef;
+    private DatabaseReference applicationsRef;
+    private boolean isSaved = false;
+    private boolean hasApplied = false;
 
     public static OpportunityDetailsFragment newInstance(String opportunityId) {
         OpportunityDetailsFragment fragment = new OpportunityDetailsFragment();
@@ -50,12 +59,17 @@ public class OpportunityDetailsFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        databaseManager = DatabaseManager.getInstance();
-        mAuth = FirebaseAuth.getInstance();
-        
         if (getArguments() != null) {
             opportunityId = getArguments().getString(ARG_OPPORTUNITY_ID);
         }
+
+        // Handle back press
+        requireActivity().getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                requireActivity().getSupportFragmentManager().popBackStack();
+            }
+        });
     }
 
     @Nullable
@@ -64,156 +78,170 @@ public class OpportunityDetailsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_opportunity_details, container, false);
 
         // Initialize views
-        titleTextView = view.findViewById(R.id.title_text_view);
-        descriptionTextView = view.findViewById(R.id.description_text_view);
-        organizationTextView = view.findViewById(R.id.organization_text_view);
-        locationTextView = view.findViewById(R.id.location_text_view);
-        dateTextView = view.findViewById(R.id.date_text_view);
-        skillsTextView = view.findViewById(R.id.requirements_text_view);
-        imageView = view.findViewById(R.id.image_view);
+        titleTextView = view.findViewById(R.id.opportunity_title);
+        organizationTextView = view.findViewById(R.id.opportunity_organization);
+        locationTextView = view.findViewById(R.id.opportunity_location);
+        descriptionTextView = view.findViewById(R.id.opportunity_description);
+        requirementsTextView = view.findViewById(R.id.opportunity_requirements);
+        benefitsTextView = view.findViewById(R.id.opportunity_benefits);
+        deadlineTextView = view.findViewById(R.id.opportunity_deadline);
+        urgentIndicator = view.findViewById(R.id.urgent_indicator);
+        remoteChip = view.findViewById(R.id.remote_chip);
+        featuredChip = view.findViewById(R.id.featured_chip);
+        saveFab = view.findViewById(R.id.save_fab);
         applyButton = view.findViewById(R.id.apply_button);
-        saveButton = view.findViewById(R.id.save_button);
-        progressBar = view.findViewById(R.id.progress_bar);
 
-        // Setup click listeners
-        applyButton.setOnClickListener(v -> handleApply());
-        saveButton.setOnClickListener(v -> handleSave());
+        // Setup toolbar
+        Toolbar toolbar = view.findViewById(R.id.toolbar);
+        toolbar.setNavigationOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
+
+        // Initialize Firebase
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        opportunityRef = FirebaseDatabase.getInstance().getReference("opportunities").child(opportunityId);
+        savedRef = FirebaseDatabase.getInstance().getReference("saved_opportunities").child(userId).child(opportunityId);
+        applicationsRef = FirebaseDatabase.getInstance().getReference("applications").child(userId).child(opportunityId);
+
+        // Load opportunity data
+        loadOpportunityData();
+        checkSavedStatus();
+        checkApplicationStatus();
+
+        // Setup save button
+        saveFab.setOnClickListener(v -> toggleSave());
+
+        // Setup apply button
+        applyButton.setOnClickListener(v -> toggleApply());
 
         return view;
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        loadOpportunityDetails();
-    }
-
-    private void loadOpportunityDetails() {
-        if (opportunityId == null) {
-            showError("Invalid opportunity ID");
-            return;
-        }
-
-        showLoading(true);
-        
-        databaseManager.getOpportunity(opportunityId, new DatabaseManager.DatabaseCallback<Opportunity>() {
+    private void loadOpportunityData() {
+        opportunityRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onSuccess(Opportunity opportunity) {
-                showLoading(false);
-                updateUI(opportunity);
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                    if (opportunity != null) {
+                        updateUI(opportunity);
+                    }
+                }
             }
 
             @Override
-            public void onError(Exception e) {
-                showLoading(false);
-                showError("Failed to load opportunity details");
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(getContext(), "Error loading opportunity: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
+    private void checkSavedStatus() {
+        savedRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                isSaved = snapshot.exists();
+                updateSaveButton();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(getContext(), "Error checking saved status: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void checkApplicationStatus() {
+        applicationsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                hasApplied = snapshot.exists();
+                updateApplyButton();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(getContext(), "Error checking application status: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void toggleSave() {
+        if (isSaved) {
+            // Unsave
+            savedRef.removeValue()
+                .addOnSuccessListener(aVoid -> {
+                    isSaved = false;
+                    updateSaveButton();
+                    Toast.makeText(getContext(), "Opportunity unsaved", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> 
+                    Toast.makeText(getContext(), "Error unsaving opportunity: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        } else {
+            // Save
+            savedRef.setValue(true)
+                .addOnSuccessListener(aVoid -> {
+                    isSaved = true;
+                    updateSaveButton();
+                    Toast.makeText(getContext(), "Opportunity saved", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> 
+                    Toast.makeText(getContext(), "Error saving opportunity: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    private void toggleApply() {
+        if (hasApplied) {
+            // Withdraw application
+            applicationsRef.removeValue()
+                .addOnSuccessListener(aVoid -> {
+                    hasApplied = false;
+                    updateApplyButton();
+                    Toast.makeText(getContext(), "Application withdrawn", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> 
+                    Toast.makeText(getContext(), "Error withdrawing application: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        } else {
+            // Apply
+            applicationsRef.setValue(true)
+                .addOnSuccessListener(aVoid -> {
+                    hasApplied = true;
+                    updateApplyButton();
+                    Toast.makeText(getContext(), "Application submitted successfully", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> 
+                    Toast.makeText(getContext(), "Error submitting application: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    private void updateSaveButton() {
+        if (isSaved) {
+            saveFab.setImageResource(R.drawable.ic_bookmark_filled);
+        } else {
+            saveFab.setImageResource(R.drawable.ic_bookmark);
+        }
+    }
+
+    private void updateApplyButton() {
+        if (hasApplied) {
+            applyButton.setText("Withdraw Application");
+            applyButton.setEnabled(true);
+        } else {
+            applyButton.setText("Apply Now");
+            applyButton.setEnabled(true);
+        }
+    }
+
     private void updateUI(Opportunity opportunity) {
-        this.opportunity = opportunity;
-        
         titleTextView.setText(opportunity.getTitle());
-        descriptionTextView.setText(opportunity.getDescription());
         organizationTextView.setText(opportunity.getOrganization());
         locationTextView.setText(opportunity.getLocation());
-        dateTextView.setText(opportunity.getDate());
-        skillsTextView.setText(opportunity.getSkills());
+        descriptionTextView.setText(opportunity.getDescription());
+        requirementsTextView.setText(opportunity.getRequirements());
+        benefitsTextView.setText(opportunity.getBenefits());
+        deadlineTextView.setText("Deadline: " + opportunity.getDeadline());
 
-        if (opportunity.getImageUrl() != null && !opportunity.getImageUrl().isEmpty()) {
-            Glide.with(this)
-                    .load(opportunity.getImageUrl())
-                    .placeholder(R.drawable.placeholder_image)
-                    .error(R.drawable.error_image)
-                    .into(imageView);
-        }
-
-        // Update button states
-        if (mAuth.getCurrentUser() != null) {
-            databaseManager.isOpportunitySaved(mAuth.getCurrentUser().getUid(), opportunityId, 
-                new DatabaseManager.DatabaseCallback<Boolean>() {
-                    @Override
-                    public void onSuccess(Boolean isSaved) {
-                        saveButton.setText(isSaved ? "Unsave" : "Save");
-                    }
-
-                    @Override
-                    public void onError(Exception e) {
-                        showError("Failed to check saved status");
-                    }
-                });
-        }
-    }
-
-    private void handleApply() {
-        if (mAuth.getCurrentUser() == null) {
-            showError("Please sign in to apply");
-            return;
-        }
-
-        if (opportunity == null) {
-            showError("Opportunity details not loaded");
-            return;
-        }
-
-        showLoading(true);
-        
-        databaseManager.applyForOpportunity(mAuth.getCurrentUser().getUid(), opportunityId, 
-            new DatabaseManager.DatabaseCallback<Void>() {
-                @Override
-                public void onSuccess(Void result) {
-                    showLoading(false);
-                    showSuccess("Application submitted successfully");
-                    applyButton.setEnabled(false);
-                    applyButton.setText("Applied");
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    showLoading(false);
-                    showError("Failed to submit application");
-                }
-            });
-    }
-
-    private void handleSave() {
-        if (mAuth.getCurrentUser() == null) {
-            showError("Please sign in to save opportunities");
-            return;
-        }
-
-        if (opportunity == null) {
-            showError("Opportunity details not loaded");
-            return;
-        }
-
-        boolean isSaving = saveButton.getText().toString().equals("Save");
-        
-        databaseManager.toggleSaveOpportunity(mAuth.getCurrentUser().getUid(), opportunityId, isSaving,
-            new DatabaseManager.DatabaseCallback<Void>() {
-                @Override
-                public void onSuccess(Void result) {
-                    saveButton.setText(isSaving ? "Unsave" : "Save");
-                    showSuccess(isSaving ? "Opportunity saved" : "Opportunity unsaved");
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    showError("Failed to update saved status");
-                }
-            });
-    }
-
-    private void showLoading(boolean isLoading) {
-        progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-    }
-
-    private void showError(String message) {
-        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-    }
-
-    private void showSuccess(String message) {
-        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+        // Update indicators
+        urgentIndicator.setVisibility(opportunity.isUrgent() ? View.VISIBLE : View.GONE);
+        remoteChip.setVisibility(opportunity.isRemote() ? View.VISIBLE : View.GONE);
+        featuredChip.setVisibility(opportunity.isFeatured() ? View.VISIBLE : View.GONE);
     }
 } 

@@ -46,7 +46,9 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
     @Override
     public void onBindViewHolder(@NonNull OpportunityViewHolder holder, int position) {
         Opportunity opportunity = opportunities.get(position);
-        holder.bind(opportunity);
+        if (opportunity != null) {
+            holder.bind(opportunity);
+        }
     }
 
     @Override
@@ -82,12 +84,15 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
         }
 
         void bind(Opportunity opportunity) {
-            titleText.setText(opportunity.getTitle());
-            organizationText.setText(opportunity.getOrganization());
-            locationText.setText(opportunity.getLocation());
-            categoryText.setText(opportunity.getCategory());
+            if (opportunity == null) return;
 
-            // Set indicators visibility
+            // Set text with null checks
+            titleText.setText(opportunity.getTitle() != null ? opportunity.getTitle() : "");
+            organizationText.setText(opportunity.getOrganization() != null ? opportunity.getOrganization() : "");
+            locationText.setText(opportunity.getLocation() != null ? opportunity.getLocation() : "");
+            categoryText.setText(opportunity.getCategory() != null ? opportunity.getCategory() : "");
+
+            // Set indicators visibility with null checks
             urgentIndicator.setVisibility(opportunity.isUrgent() ? View.VISIBLE : View.GONE);
             remoteIndicator.setVisibility(opportunity.isRemote() ? View.VISIBLE : View.GONE);
             featuredIndicator.setVisibility(opportunity.isFeatured() ? View.VISIBLE : View.GONE);

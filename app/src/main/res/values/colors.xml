@@ -69,5 +69,6 @@
     <color name="selection">#E3F2FD</color>
     <color name="selection_dark">#BBDEFB</color>
     <color name="selection_light">#F5F5F5</color>
+    <color name="urgent_red">#FFE53935</color>
 </resources>
    

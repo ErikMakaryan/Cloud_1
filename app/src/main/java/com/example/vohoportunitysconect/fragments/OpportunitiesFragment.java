@@ -104,7 +104,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
                         opportunities.add(opportunity);
                     }
                 }
-                adapter.setOpportunities(opportunities);
+                adapter.updateOpportunities(opportunities);
             }
 
             @Override
@@ -144,7 +144,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
             }
         }
 
-        adapter.setOpportunities(filteredList);
+        adapter.updateOpportunities(filteredList);
     }
 
     @Override

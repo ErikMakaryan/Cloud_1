@@ -64,6 +64,7 @@ public class Opportunity {
     private int maxParticipants;
     private String requirements;
     private String status;
+    private String benefits;
 
     // Empty constructor for Firebase
     public Opportunity() {
@@ -348,5 +349,13 @@ public class Opportunity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getBenefits() {
+        return benefits;
+    }
+
+    public void setBenefits(String benefits) {
+        this.benefits = benefits;
     }
 } 

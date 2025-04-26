@@ -28,11 +28,9 @@ public class VOHApplication extends Application {
         
         try {
             // Initialize Firebase
-            if (FirebaseApp.getApps(this).isEmpty()) {
-                FirebaseApp.initializeApp(this);
-            }
+            FirebaseApp.initializeApp(this);
             
-            // Enable Firebase persistence
+            // Enable offline persistence before any database operations
             FirebaseDatabase.getInstance().setPersistenceEnabled(true);
             
             // Initialize FirebaseManager first

@@ -139,7 +139,7 @@ public class HomeFragment extends Fragment implements OpportunityAdapter.OnOppor
                         opportunities.add(opportunity);
                     }
                 }
-                opportunityAdapter.setOpportunities(opportunities);
+                opportunityAdapter.updateOpportunities(opportunities);
             }
 
             @Override

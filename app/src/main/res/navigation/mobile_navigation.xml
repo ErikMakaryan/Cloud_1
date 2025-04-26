@@ -12,10 +12,10 @@
         tools:layout="@layout/fragment_home">
         <action
             android:id="@+id/action_homeFragment_to_opportunitiesFragment"
-            app:destination="@id/nav_opportunities" />
+            app:destination="@id/opportunitiesFragment" />
         <action
             android:id="@+id/action_homeFragment_to_applicationsFragment"
-            app:destination="@id/nav_applications" />
+            app:destination="@id/myApplicationsFragment" />
         <action
             android:id="@+id/action_homeFragment_to_opportunityDetailsFragment"
             app:destination="@id/nav_opportunity_details">
@@ -26,7 +26,7 @@
     </fragment>
 
     <fragment
-        android:id="@+id/nav_opportunities"
+        android:id="@+id/opportunitiesFragment"
         android:name="com.example.vohoportunitysconect.ui.opportunities.OpportunitiesFragment"
         android:label="@string/opportunities"
         tools:layout="@layout/fragment_opportunities">
@@ -40,13 +40,7 @@
     </fragment>
 
     <fragment
-        android:id="@+id/nav_applications"
-        android:name="com.example.vohoportunitysconect.fragments.ApplicationsFragment"
-        android:label="@string/applications"
-        tools:layout="@layout/fragment_applications" />
-
-    <fragment
-        android:id="@+id/nav_saved"
+        android:id="@+id/savedOpportunitiesFragment"
         android:name="com.example.vohoportunitysconect.ui.saved.SavedFragment"
         android:label="@string/saved"
         tools:layout="@layout/fragment_saved">
@@ -58,6 +52,12 @@
                 app:argType="string" />
         </action>
     </fragment>
+
+    <fragment
+        android:id="@+id/myApplicationsFragment"
+        android:name="com.example.vohoportunitysconect.fragments.ApplicationsFragment"
+        android:label="@string/applications"
+        tools:layout="@layout/fragment_applications" />
 
     <fragment
         android:id="@+id/nav_profile"

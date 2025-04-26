@@ -92,52 +92,15 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
         if (getActivity() == null) return;
         
         try {
-            // Check if Firebase is already initialized
-            if (FirebaseApp.getApps(getActivity()).isEmpty()) {
-                FirebaseApp.initializeApp(getActivity());
-            }
-            
             // Initialize Firebase Database with error handling
             FirebaseDatabase database = FirebaseDatabase.getInstance();
-            database.setPersistenceEnabled(true);
             
             // Get reference and enable offline persistence
             databaseRef = database.getReference();
             databaseRef.keepSynced(true);
             
-            // Test connection
-            databaseRef.child(".info/connected").addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    boolean connected = snapshot.getValue(Boolean.class);
-                    if (connected) {
-                        Log.d(TAG, "Firebase Database connected successfully");
-                        // Load opportunities only when connected
-                        loadOpportunities();
-                    } else {
-                        Log.w(TAG, "Firebase Database disconnected");
-                        if (getActivity() != null) {
-                            getActivity().runOnUiThread(() -> {
-                                Toast.makeText(getContext(), "No internet connection. Using cached data.", 
-                                    Toast.LENGTH_SHORT).show();
-                                loadOpportunities(); // Try to load cached data
-                            });
-                        }
-                    }
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    Log.e(TAG, "Firebase Database connection listener cancelled: " + error.getMessage());
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> {
-                            Toast.makeText(getContext(), "Error connecting to database: " + error.getMessage(), 
-                                Toast.LENGTH_LONG).show();
-                            loadOpportunities(); // Try to load cached data
-                        });
-                    }
-                }
-            });
+            // Test connection with retry mechanism
+            testDatabaseConnection(databaseRef, 3); // Try 3 times
             
         } catch (Exception e) {
             Log.e(TAG, "Error initializing Firebase: " + e.getMessage(), e);
@@ -154,14 +117,115 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
         }
     }
 
+    private void testDatabaseConnection(DatabaseReference ref, int retryCount) {
+        if (retryCount <= 0) {
+            Log.e(TAG, "Failed to connect to database after multiple attempts");
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    Toast.makeText(getContext(), "Failed to connect to database. Please try again later.", 
+                        Toast.LENGTH_LONG).show();
+                    emptyStateText.setText("Error connecting to database. Please check your internet connection and try again.");
+                    emptyStateText.setVisibility(View.VISIBLE);
+                    loadingProgress.setVisibility(View.GONE);
+                    swipeRefreshLayout.setRefreshing(false);
+                });
+            }
+            return;
+        }
+
+        ref.child(".info/connected").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                boolean connected = snapshot.getValue(Boolean.class);
+                if (connected) {
+                    Log.d(TAG, "Firebase Database connected successfully");
+                    // Load opportunities only when connected
+                    loadOpportunities();
+                } else {
+                    Log.w(TAG, "Firebase Database disconnected, retrying...");
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), "No internet connection. Using cached data.", 
+                                Toast.LENGTH_SHORT).show();
+                            loadOpportunities(); // Try to load cached data
+                        });
+                    }
+                    // Retry connection
+                    testDatabaseConnection(ref, retryCount - 1);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Firebase Database connection listener cancelled: " + error.getMessage());
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Error connecting to database: " + error.getMessage(), 
+                            Toast.LENGTH_LONG).show();
+                        loadOpportunities(); // Try to load cached data
+                    });
+                }
+                // Retry connection
+                testDatabaseConnection(ref, retryCount - 1);
+            }
+        });
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         // Clear references to avoid memory leaks
         if (databaseRef != null) {
-            databaseRef.removeEventListener((ValueEventListener) this);
+            databaseRef.removeEventListener(opportunitiesListener);
         }
     }
+
+    private final ValueEventListener opportunitiesListener = new ValueEventListener() {
+        @Override
+        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+            if (getActivity() == null) return;
+            
+            getActivity().runOnUiThread(() -> {
+                try {
+                    opportunities.clear();
+                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                        Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                        if (opportunity != null) {
+                            opportunity.setId(snapshot.getKey());
+                            opportunities.add(opportunity);
+                        }
+                    }
+                    
+                    filteredOpportunities.clear();
+                    filteredOpportunities.addAll(opportunities);
+                    opportunityAdapter.notifyDataSetChanged();
+                    updateEmptyState();
+                    
+                    Log.d(TAG, "Successfully loaded " + opportunities.size() + " opportunities");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error processing data: " + e.getMessage(), e);
+                    Toast.makeText(getContext(), "Error processing data: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                } finally {
+                    swipeRefreshLayout.setRefreshing(false);
+                    loadingProgress.setVisibility(View.GONE);
+                }
+            });
+        }
+
+        @Override
+        public void onCancelled(@NonNull DatabaseError databaseError) {
+            if (getActivity() == null) return;
+            
+            getActivity().runOnUiThread(() -> {
+                Log.e(TAG, "Database error: " + databaseError.getMessage());
+                Toast.makeText(getContext(), "Error loading opportunities: " + databaseError.getMessage(), 
+                    Toast.LENGTH_LONG).show();
+                swipeRefreshLayout.setRefreshing(false);
+                loadingProgress.setVisibility(View.GONE);
+            });
+        }
+    };
 
     private void loadOpportunities() {
         if (getActivity() == null || databaseRef == null) return;
@@ -175,52 +239,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
             .orderByChild("createdAt")
             .limitToLast(50);
 
-        opportunitiesQuery.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (getActivity() == null) return;
-                
-                getActivity().runOnUiThread(() -> {
-                    try {
-                        opportunities.clear();
-                        for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
-                            Opportunity opportunity = snapshot.getValue(Opportunity.class);
-                            if (opportunity != null) {
-                                opportunity.setId(snapshot.getKey());
-                                opportunities.add(opportunity);
-                            }
-                        }
-                        
-                        filteredOpportunities.clear();
-                        filteredOpportunities.addAll(opportunities);
-                        opportunityAdapter.notifyDataSetChanged();
-                        updateEmptyState();
-                        
-                        Log.d(TAG, "Successfully loaded " + opportunities.size() + " opportunities");
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error processing data: " + e.getMessage(), e);
-                        Toast.makeText(getContext(), "Error processing data: " + e.getMessage(), 
-                            Toast.LENGTH_SHORT).show();
-                    } finally {
-                        swipeRefreshLayout.setRefreshing(false);
-                        loadingProgress.setVisibility(View.GONE);
-                    }
-                });
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                if (getActivity() == null) return;
-                
-                getActivity().runOnUiThread(() -> {
-                    Log.e(TAG, "Database error: " + databaseError.getMessage());
-                    Toast.makeText(getContext(), "Error loading opportunities: " + databaseError.getMessage(), 
-                        Toast.LENGTH_LONG).show();
-                    swipeRefreshLayout.setRefreshing(false);
-                    loadingProgress.setVisibility(View.GONE);
-                });
-            }
-        });
+        opportunitiesQuery.addValueEventListener(opportunitiesListener);
     }
 
     private void setupSearchView() {
@@ -351,7 +370,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
         
         try {
             Bundle args = new Bundle();
-            args.putString("opportunityId", opportunity.getId());
+            args.putString("opportunity_id", opportunity.getId());
             NavController navController = Navigation.findNavController(getView());
             if (navController != null) {
                 navController.navigate(R.id.action_opportunitiesFragment_to_opportunityDetailsFragment, args);

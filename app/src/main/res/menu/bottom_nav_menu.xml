@@ -1,27 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/nav_home"
-        android:icon="@drawable/ic_home_black_24dp"
-        android:title="@string/title_home" />
+        android:id="@+id/opportunitiesFragment"
+        android:icon="@drawable/ic_opportunities"
+        android:title="Opportunities" />
 
     <item
-        android:id="@+id/nav_opportunities"
-        android:icon="@drawable/ic_opportunities_black_24dp"
-        android:title="@string/title_opportunities" />
+        android:id="@+id/savedOpportunitiesFragment"
+        android:icon="@drawable/ic_bookmark"
+        android:title="Saved" />
 
     <item
-        android:id="@+id/nav_applications"
-        android:icon="@drawable/ic_applications_black_24dp"
-        android:title="@string/title_applications" />
-
-    <item
-        android:id="@+id/nav_saved"
-        android:icon="@drawable/ic_saved_black_24dp"
-        android:title="@string/title_saved" />
+        android:id="@+id/myApplicationsFragment"
+        android:icon="@drawable/ic_applications"
+        android:title="Applications" />
 
     <item
         android:id="@+id/nav_profile"
-        android:icon="@drawable/ic_profile_black_24dp"
-        android:title="@string/title_profile" />
+        android:icon="@drawable/ic_profile"
+        android:title="Profile" />
 </menu>

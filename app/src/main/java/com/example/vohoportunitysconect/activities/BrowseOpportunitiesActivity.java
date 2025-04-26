@@ -71,7 +71,7 @@ public class BrowseOpportunitiesActivity extends AppCompatActivity {
                         opportunities.add(opportunity);
                     }
                 }
-                opportunityAdapter.setOpportunities(opportunities);
+                opportunityAdapter.updateOpportunities(opportunities);
             }
 
             @Override
