@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
@@ -23,12 +22,8 @@ import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
-import androidx.activity.OnBackPressedCallback;
 
 import com.example.vohoportunitysconect.activities.LoginActivity;
-import com.example.vohoportunitysconect.models.User;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.navigation.NavigationView;
@@ -115,18 +110,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
             return false;
         });
-
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                    drawerLayout.closeDrawer(GravityCompat.START);
-                } else {
-                    setEnabled(false);
-                    getOnBackPressedDispatcher().onBackPressed();
-                }
-            }
-        });
     }
 
     private void restoreUserSession() {
@@ -179,10 +162,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         // Configure AppBarConfiguration
         appBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home,
-                R.id.nav_opportunities,
-                R.id.nav_applications,
-                R.id.nav_saved,
+                R.id.opportunitiesFragment,
+                R.id.savedOpportunitiesFragment,
+                R.id.myApplicationsFragment,
                 R.id.nav_profile
         ).setOpenableLayout(drawerLayout).build();
 
@@ -306,12 +288,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } catch (Exception e) {
             Log.e(TAG, "Error updating navigation header: " + e.getMessage(), e);
         }
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main, menu);
-        return true;
     }
 
     @Override

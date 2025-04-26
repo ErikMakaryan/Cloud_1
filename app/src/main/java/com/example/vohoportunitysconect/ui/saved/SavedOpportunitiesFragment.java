@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -14,7 +13,6 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.adapters.OpportunityAdapter;
@@ -30,37 +28,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SavedOpportunitiesFragment extends Fragment implements OpportunityAdapter.OnOpportunityClickListener {
-    private RecyclerView savedRecycler;
-    private OpportunityAdapter opportunityAdapter;
-    private List<Opportunity> savedOpportunities = new ArrayList<>();
-    private DatabaseReference savedRef;
-    private DatabaseReference opportunitiesRef;
-    private SwipeRefreshLayout swipeRefreshLayout;
+    private RecyclerView savedOpportunitiesRecycler;
     private TextView emptyStateText;
-    private ProgressBar loadingProgress;
+    private View progressBar;
+    private FirebaseAuth mAuth;
+    private DatabaseReference databaseRef;
+    private OpportunityAdapter opportunityAdapter;
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_saved_opportunities, container, false);
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        mAuth = FirebaseAuth.getInstance();
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+    }
 
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View root = inflater.inflate(R.layout.fragment_saved_opportunities, container, false);
+        
         // Initialize views
-        savedRecycler = root.findViewById(R.id.saved_recycler);
-        swipeRefreshLayout = root.findViewById(R.id.swipe_refresh);
+        savedOpportunitiesRecycler = root.findViewById(R.id.saved_opportunities_recycler);
         emptyStateText = root.findViewById(R.id.empty_state_text);
-        loadingProgress = root.findViewById(R.id.loading_progress);
+        progressBar = root.findViewById(R.id.progress_bar);
 
         // Setup RecyclerView
-        savedRecycler.setLayoutManager(new LinearLayoutManager(requireContext()));
-        opportunityAdapter = new OpportunityAdapter(savedOpportunities, this);
-        savedRecycler.setAdapter(opportunityAdapter);
-
-        // Initialize Firebase
-        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        savedRef = FirebaseDatabase.getInstance().getReference("saved_opportunities").child(userId);
-        opportunitiesRef = FirebaseDatabase.getInstance().getReference("opportunities");
-
-        // Setup swipe refresh
-        swipeRefreshLayout.setOnRefreshListener(this::loadSavedOpportunities);
+        setupRecyclerView();
 
         // Load saved opportunities
         loadSavedOpportunities();
@@ -68,100 +61,95 @@ public class SavedOpportunitiesFragment extends Fragment implements OpportunityA
         return root;
     }
 
-    private void loadSavedOpportunities() {
-        if (getActivity() == null) return;
-
-        getActivity().runOnUiThread(() -> {
-            swipeRefreshLayout.setRefreshing(true);
-            loadingProgress.setVisibility(View.VISIBLE);
-        });
-
-        savedRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (getActivity() == null) return;
-
-                getActivity().runOnUiThread(() -> {
-                    try {
-                        savedOpportunities.clear();
-                        for (DataSnapshot savedSnapshot : snapshot.getChildren()) {
-                            String opportunityId = savedSnapshot.getKey();
-                            if (opportunityId != null) {
-                                // Get the full opportunity details
-                                opportunitiesRef.child(opportunityId).addListenerForSingleValueEvent(new ValueEventListener() {
-                                    @Override
-                                    public void onDataChange(@NonNull DataSnapshot opportunitySnapshot) {
-                                        if (opportunitySnapshot.exists()) {
-                                            Opportunity opportunity = opportunitySnapshot.getValue(Opportunity.class);
-                                            if (opportunity != null) {
-                                                opportunity.setId(opportunityId);
-                                                savedOpportunities.add(opportunity);
-                                                opportunityAdapter.notifyDataSetChanged();
-                                                updateEmptyState();
-                                            }
-                                        }
-                                    }
-
-                                    @Override
-                                    public void onCancelled(@NonNull DatabaseError error) {
-                                        Toast.makeText(getContext(), "Error loading opportunity: " + error.getMessage(), 
-                                            Toast.LENGTH_SHORT).show();
-                                    }
-                                });
-                            }
-                        }
-                    } catch (Exception e) {
-                        Toast.makeText(getContext(), "Error loading saved opportunities: " + e.getMessage(), 
-                            Toast.LENGTH_SHORT).show();
-                    } finally {
-                        swipeRefreshLayout.setRefreshing(false);
-                        loadingProgress.setVisibility(View.GONE);
-                    }
-                });
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                if (getActivity() == null) return;
-
-                getActivity().runOnUiThread(() -> {
-                    Toast.makeText(getContext(), "Error loading saved opportunities: " + error.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
-                    swipeRefreshLayout.setRefreshing(false);
-                    loadingProgress.setVisibility(View.GONE);
-                });
-            }
-        });
+    private void setupRecyclerView() {
+        savedOpportunitiesRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
+        opportunityAdapter = new OpportunityAdapter(new ArrayList<>(), this);
+        savedOpportunitiesRecycler.setAdapter(opportunityAdapter);
     }
 
-    private void updateEmptyState() {
-        if (getActivity() == null) return;
+    private void loadSavedOpportunities() {
+        if (mAuth.getCurrentUser() == null) {
+            showEmptyState();
+            return;
+        }
 
-        getActivity().runOnUiThread(() -> {
-            if (savedOpportunities.isEmpty()) {
-                emptyStateText.setVisibility(View.VISIBLE);
-                savedRecycler.setVisibility(View.GONE);
-                emptyStateText.setText("No saved opportunities");
-            } else {
-                emptyStateText.setVisibility(View.GONE);
-                savedRecycler.setVisibility(View.VISIBLE);
-            }
-        });
+        showLoading();
+        String userId = mAuth.getCurrentUser().getUid();
+        
+        databaseRef.child("users").child(userId).child("saved_opportunities")
+            .addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    List<Opportunity> savedOpportunities = new ArrayList<>();
+                    
+                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                        String opportunityId = snapshot.getKey();
+                        if (opportunityId != null) {
+                            databaseRef.child("opportunities").child(opportunityId)
+                                .get().addOnSuccessListener(opportunitySnapshot -> {
+                                    Opportunity opportunity = opportunitySnapshot.getValue(Opportunity.class);
+                                    if (opportunity != null) {
+                                        opportunity.setId(opportunityId);
+                                        savedOpportunities.add(opportunity);
+                                        opportunityAdapter.updateOpportunities(savedOpportunities);
+                                        updateUI(savedOpportunities);
+                                    }
+                                });
+                        }
+                    }
+                    
+                    if (savedOpportunities.isEmpty()) {
+                        showEmptyState();
+                    } else {
+                        hideLoading();
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    hideLoading();
+                    Toast.makeText(getContext(), "Error loading saved opportunities: " + databaseError.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                }
+            });
+    }
+
+    private void updateUI(List<Opportunity> opportunities) {
+        if (opportunities.isEmpty()) {
+            showEmptyState();
+        } else {
+            hideEmptyState();
+            opportunityAdapter.updateOpportunities(opportunities);
+        }
+    }
+
+    private void showLoading() {
+        progressBar.setVisibility(View.VISIBLE);
+        savedOpportunitiesRecycler.setVisibility(View.GONE);
+        emptyStateText.setVisibility(View.GONE);
+    }
+
+    private void hideLoading() {
+        progressBar.setVisibility(View.GONE);
+        savedOpportunitiesRecycler.setVisibility(View.VISIBLE);
+    }
+
+    private void showEmptyState() {
+        progressBar.setVisibility(View.GONE);
+        savedOpportunitiesRecycler.setVisibility(View.GONE);
+        emptyStateText.setVisibility(View.VISIBLE);
+    }
+
+    private void hideEmptyState() {
+        emptyStateText.setVisibility(View.GONE);
+        savedOpportunitiesRecycler.setVisibility(View.VISIBLE);
     }
 
     @Override
     public void onOpportunityClick(Opportunity opportunity) {
-        if (opportunity == null || !isAdded() || getView() == null) {
-            return;
-        }
-        
-        try {
-            Bundle args = new Bundle();
-            args.putString("opportunity_id", opportunity.getId());
-            Navigation.findNavController(getView())
-                .navigate(R.id.action_savedOpportunitiesFragment_to_opportunityDetailsFragment, args);
-        } catch (Exception e) {
-            Toast.makeText(getContext(), "Error opening opportunity details", Toast.LENGTH_SHORT).show();
-        }
+        Bundle args = new Bundle();
+        args.putString("opportunityId", opportunity.getId());
+        Navigation.findNavController(requireView())
+            .navigate(R.id.action_savedFragment_to_opportunityDetailsFragment, args);
     }
 } 

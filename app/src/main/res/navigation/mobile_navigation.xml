@@ -3,27 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@id/nav_home">
-
-    <fragment
-        android:id="@+id/nav_home"
-        android:name="com.example.vohoportunitysconect.ui.home.HomeFragment"
-        android:label="@string/home"
-        tools:layout="@layout/fragment_home">
-        <action
-            android:id="@+id/action_homeFragment_to_opportunitiesFragment"
-            app:destination="@id/opportunitiesFragment" />
-        <action
-            android:id="@+id/action_homeFragment_to_applicationsFragment"
-            app:destination="@id/myApplicationsFragment" />
-        <action
-            android:id="@+id/action_homeFragment_to_opportunityDetailsFragment"
-            app:destination="@id/nav_opportunity_details">
-            <argument
-                android:name="opportunityId"
-                app:argType="string" />
-        </action>
-    </fragment>
+    app:startDestination="@id/opportunitiesFragment">
 
     <fragment
         android:id="@+id/opportunitiesFragment"
@@ -32,7 +12,9 @@
         tools:layout="@layout/fragment_opportunities">
         <action
             android:id="@+id/action_opportunitiesFragment_to_opportunityDetailsFragment"
-            app:destination="@id/nav_opportunity_details">
+            app:destination="@id/nav_opportunity_details"
+            app:popUpTo="@id/opportunitiesFragment"
+            app:popUpToInclusive="false">
             <argument
                 android:name="opportunityId"
                 app:argType="string" />
@@ -46,7 +28,9 @@
         tools:layout="@layout/fragment_saved">
         <action
             android:id="@+id/action_savedFragment_to_opportunityDetailsFragment"
-            app:destination="@id/nav_opportunity_details">
+            app:destination="@id/nav_opportunity_details"
+            app:popUpTo="@id/opportunitiesFragment"
+            app:popUpToInclusive="false">
             <argument
                 android:name="opportunityId"
                 app:argType="string" />

@@ -364,23 +364,9 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
 
     @Override
     public void onOpportunityClick(Opportunity opportunity) {
-        if (opportunity == null || !isAdded() || getView() == null) {
-            return;
-        }
-        
-        try {
-            Bundle args = new Bundle();
-            args.putString("opportunity_id", opportunity.getId());
-            NavController navController = Navigation.findNavController(getView());
-            if (navController != null) {
-                navController.navigate(R.id.action_opportunitiesFragment_to_opportunityDetailsFragment, args);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error navigating to details: " + e.getMessage(), e);
-            Context context = getContext();
-            if (context != null) {
-                Toast.makeText(context, "Error opening opportunity details", Toast.LENGTH_SHORT).show();
-            }
-        }
+        Bundle args = new Bundle();
+        args.putString("opportunityId", opportunity.getId());
+        Navigation.findNavController(requireView())
+            .navigate(R.id.action_opportunitiesFragment_to_opportunityDetailsFragment, args);
     }
 } 

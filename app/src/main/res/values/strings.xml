@@ -79,4 +79,8 @@
     <string name="save">Save</string>
     <string name="unsave">Unsave</string>
     <string name="applied">Applied</string>
+    <string name="account">Account</string>
+    <string name="no_saved_opportunities">No saved opportunities yet</string>
+    <string name="no_applications">No applications yet</string>
+    <string name="back">Back</string>
 </resources>
