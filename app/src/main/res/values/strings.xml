@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">VO Hoportunitys Conect</string>
+    <string name="app_name">VOH</string>
     <string name="game_services_project_id">490743356878</string>
     <string name="game_services_api_key">AIzaSyB581wW737gDNSDq_bCa7iOJ0V6b29Pibo</string>
     <string name="game_services_client_id">490743356878-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com</string>
@@ -83,4 +83,11 @@
     <string name="no_saved_opportunities">No saved opportunities yet</string>
     <string name="no_applications">No applications yet</string>
     <string name="back">Back</string>
+    <string name="menu">Menu</string>
+    <!-- Application Status -->
+    <string name="apply_now">Apply Now</string>
+    <string name="cancel">Cancel</string>
+    <string name="pending">Pending</string>
+    <string name="accepted">Accepted</string>
+    <string name="rejected">Rejected</string>
 </resources>

@@ -248,7 +248,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
             // Check if views are properly inflated
             if (userNameText == null || userEmailText == null) {
-                Log.e(TAG, "Navigation header views not found");
+                Log.e(TAG, "Header text views are null");
                 return;
             }
 
@@ -287,6 +287,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         } catch (Exception e) {
             Log.e(TAG, "Error updating navigation header: " + e.getMessage(), e);
+        }
+    }
+
+    public void openDrawer() {
+        if (drawerLayout != null) {
+            drawerLayout.openDrawer(GravityCompat.START);
         }
     }
 

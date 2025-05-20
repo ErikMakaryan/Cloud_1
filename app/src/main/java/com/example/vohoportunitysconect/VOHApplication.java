@@ -8,6 +8,8 @@ import com.example.vohoportunitysconect.firebase.FirebaseManager;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.appcheck.FirebaseAppCheck;
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.example.vohoportunitysconect.BuildConfig;
@@ -29,6 +31,12 @@ public class VOHApplication extends Application {
         try {
             // Initialize Firebase
             FirebaseApp.initializeApp(this);
+            
+            // Initialize Firebase App Check
+            FirebaseAppCheck firebaseAppCheck = FirebaseAppCheck.getInstance();
+            firebaseAppCheck.installAppCheckProviderFactory(
+                PlayIntegrityAppCheckProviderFactory.getInstance()
+            );
             
             // Enable offline persistence before any database operations
             FirebaseDatabase.getInstance().setPersistenceEnabled(true);

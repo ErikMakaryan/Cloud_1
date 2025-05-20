@@ -42,7 +42,17 @@ public class CertificatesActivity extends AppCompatActivity {
 
         // Setup RecyclerView
         certificatesRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        certificateAdapter = new CertificateAdapter(this::onCertificateClick);
+        certificateAdapter = new CertificateAdapter(new ArrayList<>(), new CertificateAdapter.OnCertificateClickListener() {
+            @Override
+            public void onCertificateClick(Certificate certificate) {
+                showCertificateDetailsDialog(certificate);
+            }
+
+            @Override
+            public void onDeleteClick(Certificate certificate) {
+                showDeleteConfirmationDialog(certificate);
+            }
+        });
         certificatesRecyclerView.setAdapter(certificateAdapter);
 
         // Load certificates
@@ -66,7 +76,7 @@ public class CertificatesActivity extends AppCompatActivity {
                         certificates.add(certificate);
                     }
                 }
-                certificateAdapter.setCertificates(certificates);
+                certificateAdapter.updateCertificates(certificates);
 
                 // Show empty state if no certificates
                 findViewById(R.id.empty_state).setVisibility(
@@ -82,21 +92,20 @@ public class CertificatesActivity extends AppCompatActivity {
         });
     }
 
-    private void onCertificateClick(Certificate certificate) {
-        // Show certificate details dialog
-        showCertificateDetailsDialog(certificate);
-    }
-
     private void showCertificateDetailsDialog(Certificate certificate) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(certificate.getTitle())
+            .setTitle(certificate.getName())
             .setMessage(
-                "Description: " + certificate.getDescription() + "\n\n" +
-                "Skills: " + certificate.getSkills() + "\n" +
-                "Hours Completed: " + certificate.getHoursCompleted() + "\n" +
-                "Issue Date: " + certificate.getIssueDate()
+                "Certificate Name: " + certificate.getName() + "\n\n" +
+                "Upload Date: " + new java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                    .format(new java.util.Date(certificate.getUploadDate()))
             )
-            .setPositiveButton("Share", (dialog, which) -> shareCertificate(certificate))
+            .setPositiveButton("View", (dialog, which) -> {
+                // Open the certificate file
+                android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                intent.setData(android.net.Uri.parse(certificate.getFileUrl()));
+                startActivity(intent);
+            })
             .setNegativeButton("Close", null)
             .show();
     }
@@ -105,12 +114,34 @@ public class CertificatesActivity extends AppCompatActivity {
         android.content.Intent shareIntent = new android.content.Intent();
         shareIntent.setAction(android.content.Intent.ACTION_SEND);
         shareIntent.putExtra(android.content.Intent.EXTRA_TEXT,
-            "I received a certificate for volunteering!\n\n" +
-            "Title: " + certificate.getTitle() + "\n" +
-            "Skills: " + certificate.getSkills() + "\n" +
-            "Hours: " + certificate.getHoursCompleted()
+            "I received a certificate!\n\n" +
+            "Certificate Name: " + certificate.getName() + "\n" +
+            "Upload Date: " + new java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                .format(new java.util.Date(certificate.getUploadDate()))
         );
         shareIntent.setType("text/plain");
         startActivity(android.content.Intent.createChooser(shareIntent, "Share Certificate"));
+    }
+
+    private void showDeleteConfirmationDialog(Certificate certificate) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Delete Certificate")
+            .setMessage("Are you sure you want to delete this certificate?")
+            .setPositiveButton("Delete", (dialog, which) -> deleteCertificate(certificate))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void deleteCertificate(Certificate certificate) {
+        String userId = mAuth.getCurrentUser().getUid();
+        dbRef.child("certificates")
+            .child(certificate.getId())
+            .removeValue()
+            .addOnSuccessListener(aVoid -> {
+                Toast.makeText(this, "Certificate deleted successfully", Toast.LENGTH_SHORT).show();
+            })
+            .addOnFailureListener(e -> {
+                Toast.makeText(this, "Failed to delete certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
     }
 } 

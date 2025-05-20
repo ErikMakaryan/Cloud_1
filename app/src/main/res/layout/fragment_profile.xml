@@ -198,18 +198,25 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Recent Activity"
-                        android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6" />
+                        android:text="Certificates"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="16dp" />
 
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/activity_recycler_view"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/add_certificate_button"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:nestedScrollingEnabled="false"
-                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                        tools:itemCount="3"
-                        tools:listitem="@layout/item_activity" />
+                        android:text="Add Certificate"
+                        app:icon="@drawable/ic_add"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/certificates_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:nestedScrollingEnabled="false" />
 
                 </LinearLayout>
 

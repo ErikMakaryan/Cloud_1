@@ -7,35 +7,20 @@ import com.google.firebase.database.IgnoreExtraProperties;
 public class Certificate {
     @Exclude
     private String id;
-    private String userId;
-    private String title;
-    private String description;
-    private String issuer;
-    private String certificateUrl;
-    private long issueDate;
-    private long expiryDate;
-    private boolean isVerified;
-    private long createdAt;
-    private String skills;
-    private int hoursCompleted;
+    private String name;
+    private String fileUrl;
+    private long uploadDate;
 
+    // Default constructor for Firebase
     public Certificate() {
-        // Required empty constructor for Firestore
     }
 
-    public Certificate(String userId, String title, String description, String issuer,
-                      String certificateUrl, long issueDate, long expiryDate, String skills, int hoursCompleted) {
-        this.userId = userId;
-        this.title = title;
-        this.description = description;
-        this.issuer = issuer;
-        this.certificateUrl = certificateUrl;
-        this.issueDate = issueDate;
-        this.expiryDate = expiryDate;
-        this.isVerified = false;
-        this.createdAt = System.currentTimeMillis();
-        this.skills = skills;
-        this.hoursCompleted = hoursCompleted;
+    // Constructor for creating new certificates
+    public Certificate(String id, String name, String fileUrl, long uploadDate) {
+        this.id = id;
+        this.name = name;
+        this.fileUrl = fileUrl;
+        this.uploadDate = uploadDate;
     }
 
     @Exclude
@@ -48,91 +33,27 @@ public class Certificate {
         this.id = id;
     }
 
-    public String getUserId() {
-        return userId;
+    public String getName() {
+        return name;
     }
 
-    public void setUserId(String userId) {
-        this.userId = userId;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public String getTitle() {
-        return title;
+    public String getFileUrl() {
+        return fileUrl;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
+    public void setFileUrl(String fileUrl) {
+        this.fileUrl = fileUrl;
     }
 
-    public String getDescription() {
-        return description;
+    public long getUploadDate() {
+        return uploadDate;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getIssuer() {
-        return issuer;
-    }
-
-    public void setIssuer(String issuer) {
-        this.issuer = issuer;
-    }
-
-    public String getCertificateUrl() {
-        return certificateUrl;
-    }
-
-    public void setCertificateUrl(String certificateUrl) {
-        this.certificateUrl = certificateUrl;
-    }
-
-    public long getIssueDate() {
-        return issueDate;
-    }
-
-    public void setIssueDate(long issueDate) {
-        this.issueDate = issueDate;
-    }
-
-    public long getExpiryDate() {
-        return expiryDate;
-    }
-
-    public void setExpiryDate(long expiryDate) {
-        this.expiryDate = expiryDate;
-    }
-
-    public boolean isVerified() {
-        return isVerified;
-    }
-
-    public void setVerified(boolean verified) {
-        isVerified = verified;
-    }
-
-    public long getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(long createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public String getSkills() {
-        return skills;
-    }
-
-    public void setSkills(String skills) {
-        this.skills = skills;
-    }
-
-    public int getHoursCompleted() {
-        return hoursCompleted;
-    }
-
-    public void setHoursCompleted(int hoursCompleted) {
-        this.hoursCompleted = hoursCompleted;
+    public void setUploadDate(long uploadDate) {
+        this.uploadDate = uploadDate;
     }
 } 

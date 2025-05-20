@@ -18,22 +18,30 @@
             <argument
                 android:name="opportunityId"
                 app:argType="string" />
+            <argument
+                android:name="previousFragment"
+                app:argType="string"
+                android:defaultValue="opportunities" />
         </action>
     </fragment>
 
     <fragment
         android:id="@+id/savedOpportunitiesFragment"
-        android:name="com.example.vohoportunitysconect.ui.saved.SavedFragment"
+        android:name="com.example.vohoportunitysconect.ui.saved.SavedOpportunitiesFragment"
         android:label="@string/saved"
-        tools:layout="@layout/fragment_saved">
+        tools:layout="@layout/fragment_saved_opportunities">
         <action
-            android:id="@+id/action_savedFragment_to_opportunityDetailsFragment"
+            android:id="@+id/action_savedOpportunitiesFragment_to_opportunityDetailsFragment"
             app:destination="@id/nav_opportunity_details"
-            app:popUpTo="@id/opportunitiesFragment"
+            app:popUpTo="@id/savedOpportunitiesFragment"
             app:popUpToInclusive="false">
             <argument
                 android:name="opportunityId"
                 app:argType="string" />
+            <argument
+                android:name="previousFragment"
+                app:argType="string"
+                android:defaultValue="saved" />
         </action>
     </fragment>
 
@@ -56,6 +64,9 @@
         tools:layout="@layout/fragment_opportunity_details">
         <argument
             android:name="opportunityId"
+            app:argType="string" />
+        <argument
+            android:name="previousFragment"
             app:argType="string" />
     </fragment>
 

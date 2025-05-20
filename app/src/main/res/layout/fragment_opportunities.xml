@@ -29,31 +29,6 @@
             android:layout_marginTop="8dp"
             app:singleSelection="false"
             app:layout_constraintTop_toBottomOf="@id/search_view">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_remote"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Remote"
-                app:chipBackgroundColor="@color/chip_background"
-                app:chipIcon="@drawable/ic_remote" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_featured"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Featured"
-                app:chipBackgroundColor="@color/chip_background"
-                app:chipIcon="@drawable/ic_star" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_urgent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Urgent"
-                app:chipBackgroundColor="@color/chip_background"
-                app:chipIcon="@drawable/ic_urgent" />
-
         </com.google.android.material.chip.ChipGroup>
 
         <androidx.recyclerview.widget.RecyclerView

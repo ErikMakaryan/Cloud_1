@@ -3,7 +3,7 @@ package com.example.vohoportunitysconect.ui.opportunities;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -11,12 +11,17 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.models.Opportunity;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.List;
 
 public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.OpportunityViewHolder> {
-    private final List<Opportunity> opportunities;
+    private List<Opportunity> opportunities;
     private final OnOpportunityClickListener listener;
+    private final DatabaseReference databaseRef;
+    private final String userId;
 
     public interface OnOpportunityClickListener {
         void onOpportunityClick(Opportunity opportunity);
@@ -25,30 +30,55 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
     public OpportunityAdapter(List<Opportunity> opportunities, OnOpportunityClickListener listener) {
         this.opportunities = opportunities;
         this.listener = listener;
-    }
-
-    public void updateOpportunities(List<Opportunity> newOpportunities) {
-        if (newOpportunities != null) {
-            this.opportunities.clear();
-            this.opportunities.addAll(newOpportunities);
-            notifyDataSetChanged();
-        }
+        this.databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+        this.userId = FirebaseAuth.getInstance().getCurrentUser() != null ? 
+            FirebaseAuth.getInstance().getCurrentUser().getUid() : null;
     }
 
     @NonNull
     @Override
     public OpportunityViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_opportunity, parent, false);
+            .inflate(R.layout.item_opportunity, parent, false);
         return new OpportunityViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull OpportunityViewHolder holder, int position) {
         Opportunity opportunity = opportunities.get(position);
-        if (opportunity != null) {
-            holder.bind(opportunity);
+        holder.bind(opportunity, listener);
+
+        // Check if opportunity is saved
+        if (userId != null) {
+            databaseRef.child("users").child(userId).child("saved_opportunities")
+                .child(opportunity.getId()).get().addOnSuccessListener(snapshot -> {
+                    boolean isSaved = snapshot.exists();
+                    holder.saveButton.setImageResource(isSaved ? 
+                        R.drawable.ic_bookmark : R.drawable.ic_bookmark_border);
+                });
         }
+
+        // Set up save button click listener
+        holder.saveButton.setOnClickListener(v -> {
+            if (userId != null) {
+                DatabaseReference savedRef = databaseRef.child("users").child(userId)
+                    .child("saved_opportunities").child(opportunity.getId());
+                
+                savedRef.get().addOnSuccessListener(snapshot -> {
+                    if (snapshot.exists()) {
+                        // Remove from saved
+                        savedRef.removeValue().addOnSuccessListener(aVoid -> {
+                            holder.saveButton.setImageResource(R.drawable.ic_bookmark_border);
+                        });
+                    } else {
+                        // Add to saved
+                        savedRef.setValue(opportunity).addOnSuccessListener(aVoid -> {
+                            holder.saveButton.setImageResource(R.drawable.ic_bookmark);
+                        });
+                    }
+                });
+            }
+        });
     }
 
     @Override
@@ -56,46 +86,34 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
         return opportunities.size();
     }
 
-    class OpportunityViewHolder extends RecyclerView.ViewHolder {
+    public void updateOpportunities(List<Opportunity> newOpportunities) {
+        this.opportunities = newOpportunities;
+        notifyDataSetChanged();
+    }
+
+    static class OpportunityViewHolder extends RecyclerView.ViewHolder {
         private final TextView titleText;
         private final TextView organizationText;
         private final TextView locationText;
         private final TextView categoryText;
-        private final ImageView urgentIndicator;
-        private final ImageView remoteIndicator;
-        private final ImageView featuredIndicator;
+        private final ImageButton saveButton;
 
-        OpportunityViewHolder(@NonNull View itemView) {
+        public OpportunityViewHolder(@NonNull View itemView) {
             super(itemView);
             titleText = itemView.findViewById(R.id.opportunity_title);
             organizationText = itemView.findViewById(R.id.opportunity_organization);
             locationText = itemView.findViewById(R.id.opportunity_location);
             categoryText = itemView.findViewById(R.id.opportunity_category);
-            urgentIndicator = itemView.findViewById(R.id.urgent_indicator);
-            remoteIndicator = itemView.findViewById(R.id.remote_indicator);
-            featuredIndicator = itemView.findViewById(R.id.featured_indicator);
-
-            itemView.setOnClickListener(v -> {
-                int position = getBindingAdapterPosition();
-                if (position != RecyclerView.NO_POSITION) {
-                    listener.onOpportunityClick(opportunities.get(position));
-                }
-            });
+            saveButton = itemView.findViewById(R.id.save_button);
         }
 
-        void bind(Opportunity opportunity) {
-            if (opportunity == null) return;
+        public void bind(Opportunity opportunity, OnOpportunityClickListener listener) {
+            titleText.setText(opportunity.getTitle());
+            organizationText.setText(opportunity.getOrganization());
+            locationText.setText(opportunity.getLocation());
+            categoryText.setText(opportunity.getCategory());
 
-            // Set text with null checks
-            titleText.setText(opportunity.getTitle() != null ? opportunity.getTitle() : "");
-            organizationText.setText(opportunity.getOrganization() != null ? opportunity.getOrganization() : "");
-            locationText.setText(opportunity.getLocation() != null ? opportunity.getLocation() : "");
-            categoryText.setText(opportunity.getCategory() != null ? opportunity.getCategory() : "");
-
-            // Set indicators visibility with null checks
-            urgentIndicator.setVisibility(opportunity.isUrgent() ? View.VISIBLE : View.GONE);
-            remoteIndicator.setVisibility(opportunity.isRemote() ? View.VISIBLE : View.GONE);
-            featuredIndicator.setVisibility(opportunity.isFeatured() ? View.VISIBLE : View.GONE);
+            itemView.setOnClickListener(v -> listener.onOpportunityClick(opportunity));
         }
     }
 } 

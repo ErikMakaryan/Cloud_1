@@ -5,6 +5,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -12,7 +13,11 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.models.Application;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -23,6 +28,8 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
     private List<Application> applications;
     private OnApplicationClickListener listener;
     private SimpleDateFormat dateFormat;
+    private final DatabaseReference databaseRef;
+    private final String userId;
 
     public interface OnApplicationClickListener {
         void onApplicationClick(Application application);
@@ -32,6 +39,8 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
         this.applications = applications;
         this.listener = listener;
         this.dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+        this.userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        this.databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
     }
 
     @NonNull
@@ -64,6 +73,7 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
         private TextView organizationText;
         private TextView appliedDateText;
         private Chip statusChip;
+        private MaterialButton cancelButton;
 
         public ApplicationViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -72,6 +82,7 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
             organizationText = itemView.findViewById(R.id.organization_text);
             appliedDateText = itemView.findViewById(R.id.applied_date_text);
             statusChip = itemView.findViewById(R.id.status_chip);
+            cancelButton = itemView.findViewById(R.id.cancel_button);
 
             itemView.setOnClickListener(v -> {
                 int position = getBindingAdapterPosition();
@@ -79,6 +90,34 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
                     listener.onApplicationClick(applications.get(position));
                 }
             });
+
+            cancelButton.setOnClickListener(v -> {
+                int position = getBindingAdapterPosition();
+                if (position != RecyclerView.NO_POSITION) {
+                    Application application = applications.get(position);
+                    cancelApplication(application);
+                }
+            });
+        }
+
+        private void cancelApplication(Application application) {
+            databaseRef.child("applications")
+                .child(userId)
+                .child(application.getOpportunityId())
+                .removeValue()
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(itemView.getContext(), "Application cancelled", Toast.LENGTH_SHORT).show();
+                    // Remove from local list
+                    int position = getBindingAdapterPosition();
+                    if (position != RecyclerView.NO_POSITION) {
+                        applications.remove(position);
+                        notifyItemRemoved(position);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(itemView.getContext(), "Error cancelling application: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                });
         }
 
         public void bind(Application application) {
@@ -99,16 +138,20 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
             // Set status chip
             switch (application.getStatusEnum()) {
                 case PENDING:
-                    statusChip.setText("Pending");
+                    statusChip.setText(R.string.pending);
                     statusChip.setChipBackgroundColorResource(R.color.status_pending);
+                    cancelButton.setVisibility(View.VISIBLE);
+                    cancelButton.setText(R.string.cancel);
                     break;
                 case ACCEPTED:
-                    statusChip.setText("Accepted");
+                    statusChip.setText(R.string.accepted);
                     statusChip.setChipBackgroundColorResource(R.color.status_accepted);
+                    cancelButton.setVisibility(View.GONE);
                     break;
                 case REJECTED:
-                    statusChip.setText("Rejected");
+                    statusChip.setText(R.string.rejected);
                     statusChip.setChipBackgroundColorResource(R.color.status_rejected);
+                    cancelButton.setVisibility(View.GONE);
                     break;
             }
         }

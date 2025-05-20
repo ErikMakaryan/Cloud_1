@@ -1,4 +1,4 @@
-package com.example.vohoportunitysconect.adapters;
+package com.example.vohoportunitysconect.ui.profile;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,9 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.models.Certificate;
 
-import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.Locale;
 
 public class CertificateAdapter extends RecyclerView.Adapter<CertificateAdapter.CertificateViewHolder> {
     private List<Certificate> certificates;
@@ -34,14 +32,14 @@ public class CertificateAdapter extends RecyclerView.Adapter<CertificateAdapter.
     @Override
     public CertificateViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_certificate, parent, false);
+            .inflate(R.layout.item_certificate, parent, false);
         return new CertificateViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull CertificateViewHolder holder, int position) {
         Certificate certificate = certificates.get(position);
-        holder.bind(certificate);
+        holder.bind(certificate, listener);
     }
 
     @Override
@@ -54,39 +52,21 @@ public class CertificateAdapter extends RecyclerView.Adapter<CertificateAdapter.
         notifyDataSetChanged();
     }
 
-    class CertificateViewHolder extends RecyclerView.ViewHolder {
+    static class CertificateViewHolder extends RecyclerView.ViewHolder {
         private final TextView nameText;
-        private final TextView dateText;
         private final ImageButton deleteButton;
 
-        CertificateViewHolder(@NonNull View itemView) {
+        public CertificateViewHolder(@NonNull View itemView) {
             super(itemView);
             nameText = itemView.findViewById(R.id.certificate_name);
-            dateText = itemView.findViewById(R.id.certificate_date);
             deleteButton = itemView.findViewById(R.id.delete_button);
-
-            itemView.setOnClickListener(v -> {
-                int position = getBindingAdapterPosition();
-                if (position != RecyclerView.NO_POSITION) {
-                    listener.onCertificateClick(certificates.get(position));
-                }
-            });
-
-            deleteButton.setOnClickListener(v -> {
-                int position = getBindingAdapterPosition();
-                if (position != RecyclerView.NO_POSITION) {
-                    listener.onDeleteClick(certificates.get(position));
-                }
-            });
         }
 
-        void bind(Certificate certificate) {
+        public void bind(Certificate certificate, OnCertificateClickListener listener) {
             nameText.setText(certificate.getName());
-            
-            // Format the date
-            SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-            String formattedDate = dateFormat.format(certificate.getUploadDate());
-            dateText.setText(formattedDate);
+
+            itemView.setOnClickListener(v -> listener.onCertificateClick(certificate));
+            deleteButton.setOnClickListener(v -> listener.onDeleteClick(certificate));
         }
     }
 } 

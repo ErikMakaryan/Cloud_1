@@ -67,7 +67,7 @@ public class ApplicationListFragment extends Fragment {
 
     private void initializeViews(View view) {
         recyclerView = view.findViewById(R.id.applications_recycler);
-        databaseRef = FirebaseDatabase.getInstance("https://vohoportunitysconect-default-rtdb.firebaseio.com").getReference();
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
         auth = FirebaseAuth.getInstance();
         applications = new ArrayList<>();
     }
@@ -89,13 +89,11 @@ public class ApplicationListFragment extends Fragment {
         }
 
         String userId = currentUser.getUid();
-        Query applicationsQuery = databaseRef.child("applications")
-                .orderByChild("userId")
-                .equalTo(userId);
+        DatabaseReference applicationsRef = databaseRef.child("applications").child(userId);
 
         // Remove existing listener if any
         if (valueEventListener != null) {
-            applicationsQuery.removeEventListener(valueEventListener);
+            applicationsRef.removeEventListener(valueEventListener);
         }
 
         valueEventListener = new ValueEventListener() {
@@ -130,7 +128,7 @@ public class ApplicationListFragment extends Fragment {
             }
         };
 
-        applicationsQuery.addValueEventListener(valueEventListener);
+        applicationsRef.addValueEventListener(valueEventListener);
     }
 
     @Override

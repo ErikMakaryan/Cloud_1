@@ -24,42 +24,41 @@ import com.example.vohoportunitysconect.activities.EditProfileActivity;
 import com.example.vohoportunitysconect.activities.LoginActivity;
 import com.example.vohoportunitysconect.activities.SettingsActivity;
 import com.example.vohoportunitysconect.activities.CreateOpportunityActivity;
-import com.example.vohoportunitysconect.adapters.ActivityAdapter;
-import com.example.vohoportunitysconect.models.Activity;
+import com.example.vohoportunitysconect.models.Certificate;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.Query;
-import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 public class ProfileFragment extends Fragment {
     private ShapeableImageView profileImage;
     private TextView nameText, emailText, hoursText, volunteerHoursText, opportunitiesText, applicationsCount;
-    private RecyclerView activityRecyclerView;
     private MaterialButton editProfileButton, settingsButton, signOutButton, addHoursButton, createOpportunityButton;
-    private ActivityAdapter activityAdapter;
     private FirebaseAuth mAuth;
     private DatabaseReference databaseRef;
     private StorageReference storageRef;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private Uri selectedFileUri;
+    private CertificateAdapter adapter;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mAuth = FirebaseAuth.getInstance();
-        databaseRef = FirebaseDatabase.getInstance().getReference();
-        storageRef = FirebaseStorage.getInstance().getReference("profile_images");
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+        storageRef = FirebaseStorage.getInstance().getReference();
 
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -84,16 +83,11 @@ public class ProfileFragment extends Fragment {
         volunteerHoursText = root.findViewById(R.id.volunteer_hours_text);
         opportunitiesText = root.findViewById(R.id.opportunities_text);
         applicationsCount = root.findViewById(R.id.applications_count);
-        activityRecyclerView = root.findViewById(R.id.activity_recycler_view);
         editProfileButton = root.findViewById(R.id.edit_profile_button);
         settingsButton = root.findViewById(R.id.settings_button);
         signOutButton = root.findViewById(R.id.sign_out_button);
         addHoursButton = root.findViewById(R.id.add_hours_button);
         createOpportunityButton = root.findViewById(R.id.create_opportunity_button);
-
-        activityRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        activityAdapter = new ActivityAdapter();
-        activityRecyclerView.setAdapter(activityAdapter);
 
         setupClickListeners();
         checkAuthAndLoadData();
@@ -101,10 +95,44 @@ public class ProfileFragment extends Fragment {
         return root;
     }
 
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        // Setup RecyclerView
+        adapter = new CertificateAdapter(new ArrayList<>(), new CertificateAdapter.OnCertificateClickListener() {
+            @Override
+            public void onCertificateClick(Certificate certificate) {
+                // Open certificate file
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(Uri.parse(certificate.getFileUrl()));
+                startActivity(intent);
+            }
+
+            @Override
+            public void onDeleteClick(Certificate certificate) {
+                showDeleteConfirmationDialog(certificate);
+            }
+        });
+
+        RecyclerView certificatesRecyclerView = view.findViewById(R.id.certificates_recycler_view);
+        certificatesRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        certificatesRecyclerView.setAdapter(adapter);
+
+        // Setup add certificate button
+        view.findViewById(R.id.add_certificate_button).setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("application/pdf");
+            imagePickerLauncher.launch(intent);
+        });
+
+        // Load certificates
+        loadCertificates();
+    }
+
     private void checkAuthAndLoadData() {
         if (mAuth.getCurrentUser() != null) {
             loadUserData();
-            loadRecentActivity();
         } else {
             // User is not authenticated, redirect to login
             startActivity(new Intent(getContext(), LoginActivity.class));
@@ -215,49 +243,6 @@ public class ProfileFragment extends Fragment {
         }
     }
 
-    private void loadRecentActivity() {
-        if (mAuth.getCurrentUser() != null) {
-            String userId = mAuth.getCurrentUser().getUid();
-            Query activitiesQuery = databaseRef.child("activities")
-                    .orderByChild("userId")
-                    .equalTo(userId)
-                    .limitToLast(5);
-
-            activitiesQuery.addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    List<Activity> activities = new ArrayList<>();
-                    if (dataSnapshot.exists()) {
-                        for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
-                            try {
-                                Activity activity = snapshot.getValue(Activity.class);
-                                if (activity != null) {
-                                    activity.setId(snapshot.getKey());
-                                    // Ensure timestamp is set
-                                    if (activity.getTimestamp() == null) {
-                                        activity.setTimestamp(new Date());
-                                    }
-                                    activities.add(activity);
-                                }
-                            } catch (Exception e) {
-                                Log.e("ProfileFragment", "Error parsing activity: " + e.getMessage());
-                            }
-                        }
-                    }
-                    activityAdapter.setActivities(activities);
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Log.e("ProfileFragment", "Error loading activities: " + databaseError.getMessage());
-                    Toast.makeText(getContext(), "Error loading activities: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
-        } else {
-            Toast.makeText(getContext(), "Please sign in to view activities", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     private void uploadProfileImage(Uri imageUri) {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
@@ -281,5 +266,67 @@ public class ProfileFragment extends Fragment {
                     })
                     .addOnFailureListener(e -> Toast.makeText(getContext(), "Error updating image: " + e.getMessage(), Toast.LENGTH_SHORT).show());
         }
+    }
+
+    private void showDeleteConfirmationDialog(Certificate certificate) {
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Delete Certificate")
+            .setMessage("Are you sure you want to delete this certificate?")
+            .setPositiveButton("Delete", (dialog, which) -> deleteCertificate(certificate))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void deleteCertificate(Certificate certificate) {
+        if (mAuth.getCurrentUser() == null) return;
+
+        // Show progress
+        Toast.makeText(requireContext(), "Deleting certificate...", Toast.LENGTH_SHORT).show();
+
+        // Delete from Storage
+        StorageReference storageRef = FirebaseStorage.getInstance().getReferenceFromUrl(certificate.getFileUrl());
+        storageRef.delete()
+            .addOnSuccessListener(aVoid -> {
+                // Delete from Database
+                String userId = mAuth.getCurrentUser().getUid();
+                databaseRef.child("users").child(userId).child("certificates").child(certificate.getId()).removeValue()
+                    .addOnSuccessListener(aVoid2 -> {
+                        Toast.makeText(requireContext(), "Certificate deleted successfully", Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(requireContext(), "Failed to delete certificate", Toast.LENGTH_SHORT).show();
+                    });
+            })
+            .addOnFailureListener(e -> {
+                Toast.makeText(requireContext(), "Failed to delete certificate file", Toast.LENGTH_SHORT).show();
+            });
+    }
+
+    private void loadCertificates() {
+        if (mAuth.getCurrentUser() == null) return;
+
+        String userId = mAuth.getCurrentUser().getUid();
+        databaseRef.child("users")
+            .child(userId)
+            .child("certificates")
+            .addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    List<Certificate> certificates = new ArrayList<>();
+                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                        Certificate certificate = snapshot.getValue(Certificate.class);
+                        if (certificate != null) {
+                            certificate.setId(snapshot.getKey());
+                            certificates.add(certificate);
+                        }
+                    }
+                    adapter.updateCertificates(certificates);
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    Toast.makeText(requireContext(), "Error loading certificates: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            });
     }
 } 

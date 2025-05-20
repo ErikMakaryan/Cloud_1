@@ -169,6 +169,20 @@ public class DatabaseManager {
         activeListeners.clear();
     }
 
+    public void clearUserData() {
+        if (!isInitialized || databaseRef == null) {
+            Log.e(TAG, "DatabaseManager not initialized or database reference is null");
+            return;
+        }
+
+        // Remove all active listeners
+        removeAllListeners();
+
+        // Clear any cached data
+        // Note: Firebase handles its own caching, so we don't need to clear it manually
+        Log.d(TAG, "User data cleared successfully");
+    }
+
     // User operations
     public void saveUser(User user, DatabaseCallback<Void> callback) {
         checkAuthentication(callback, () -> {

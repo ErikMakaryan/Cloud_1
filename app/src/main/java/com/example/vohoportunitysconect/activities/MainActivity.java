@@ -3,10 +3,12 @@ package com.example.vohoportunitysconect.activities;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.navigation.NavController;
@@ -21,7 +23,7 @@ import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "MainActivity";
     private NavController navController;
     private AppBarConfiguration appBarConfiguration;
@@ -79,8 +81,36 @@ public class MainActivity extends AppCompatActivity {
             if (navigationView != null) {
                 // Setup the NavigationView with the NavController
                 NavigationUI.setupWithNavController(navigationView, navController);
+                // Set the navigation item click listener
+                navigationView.setNavigationItemSelectedListener(this);
             }
         }
+    }
+
+    @Override
+    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        
+        if (id == R.id.nav_logout) {
+            // Handle logout
+            mAuth.signOut();
+            Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show();
+            
+            // Clear any stored data
+            if (databaseManager != null) {
+                databaseManager.clearUserData();
+            }
+            
+            // Redirect to login screen
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+            return true;
+        }
+        
+        // Let the NavigationUI handle other navigation items
+        return NavigationUI.onNavDestinationSelected(item, navController);
     }
 
     private void updateNavigationHeader() {

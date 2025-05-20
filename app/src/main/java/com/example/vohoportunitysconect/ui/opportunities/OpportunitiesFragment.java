@@ -50,9 +50,6 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
     private TextView emptyStateText;
     private ProgressBar loadingProgress;
     private ChipGroup filterChipGroup;
-    private Chip remoteChip;
-    private Chip featuredChip;
-    private Chip urgentChip;
     private String currentCategory = "";
 
     @SuppressLint("SetTextI18n")
@@ -66,9 +63,6 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
         emptyStateText = root.findViewById(R.id.empty_state_text);
         loadingProgress = root.findViewById(R.id.loading_progress);
         filterChipGroup = root.findViewById(R.id.filter_chip_group);
-        remoteChip = root.findViewById(R.id.chip_remote);
-        featuredChip = root.findViewById(R.id.chip_featured);
-        urgentChip = root.findViewById(R.id.chip_urgent);
         
         // Initialize RecyclerView
         opportunitiesRecycler = root.findViewById(R.id.opportunities_recycler);
@@ -78,7 +72,6 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
         
         // Setup UI components
         setupSearchView();
-        setupFilterChips();
         swipeRefreshLayout.setOnRefreshListener(this::loadOpportunities);
         
         // Initialize Firebase in a separate method
@@ -277,15 +270,12 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
     @SuppressLint("NotifyDataSetChanged")
     private void applyFilters() {
         if (getActivity() == null || opportunityAdapter == null || searchView == null || 
-            remoteChip == null || featuredChip == null || urgentChip == null) {
+            filterChipGroup == null) {
             return;
         }
         
         CharSequence query = searchView.getQuery();
         String searchQuery = query != null ? query.toString().toLowerCase(Locale.getDefault()) : "";
-        boolean isRemoteSelected = remoteChip.isChecked();
-        boolean isFeaturedSelected = featuredChip.isChecked();
-        boolean isUrgentSelected = urgentChip.isChecked();
 
         List<Opportunity> newFilteredList = new ArrayList<>();
         for (Opportunity opportunity : opportunities) {
@@ -313,18 +303,7 @@ public class OpportunitiesFragment extends Fragment implements OpportunityAdapte
                     (category != null && category.toLowerCase(Locale.getDefault()).contains(searchQuery));
             }
 
-            boolean matchesFilters = true;
-            if (isRemoteSelected && !opportunity.isRemote()) {
-                matchesFilters = false;
-            }
-            if (isFeaturedSelected && !opportunity.isFeatured()) {
-                matchesFilters = false;
-            }
-            if (isUrgentSelected && !opportunity.isUrgent()) {
-                matchesFilters = false;
-            }
-
-            if (matchesSearch && matchesFilters) {
+            if (matchesSearch) {
                 newFilteredList.add(opportunity);
             }
         }
