@@ -1,96 +1,46 @@
 package com.example.vohoportunitysconect.models;
 
 import com.google.firebase.database.Exclude;
-import com.google.firebase.database.IgnoreExtraProperties;
-
 import java.util.Date;
 
-@IgnoreExtraProperties
 public class Application {
-    @Exclude
     private String id;
-    private String userId;
     private String opportunityId;
     private String opportunityTitle;
-    private String organizationId;
     private String organizationName;
-    private String organizationImageUrl;
+    private String volunteerId;
+    private String volunteerName;
+    private String volunteerEmail;
+    private String organizerId;
+    private String message;
     private String status;
-    private String coverLetter;
-    private long createdAt;
-    private long updatedAt;
-
-    public enum Status {
-        PENDING("Pending"),
-        ACCEPTED("Accepted"),
-        REJECTED("Rejected"),
-        WITHDRAWN("Withdrawn");
-
-        private final String displayName;
-
-        Status(String displayName) {
-            this.displayName = displayName;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public static Status fromString(String status) {
-            for (Status s : Status.values()) {
-                if (s.name().equalsIgnoreCase(status)) {
-                    return s;
-                }
-            }
-            return PENDING;
-        }
-    }
+    private Date appliedDate;
 
     public Application() {
-        // Required empty constructor for Realtime Database
+        // Required empty constructor for Firebase
     }
 
-    public Application(String userId, String opportunityId, String coverLetter) {
-        this.userId = userId;
-        this.opportunityId = opportunityId;
-        this.coverLetter = coverLetter;
-        this.status = Status.PENDING.name();
-        this.createdAt = System.currentTimeMillis();
-        this.updatedAt = System.currentTimeMillis();
-    }
-
-    public Application(String id, String userId, String opportunityId, String opportunityTitle,
-                      String organizationId, String organizationName, String organizationImageUrl,
-                      Date appliedDate, Status status, String coverLetter) {
-        this.id = id;
-        this.userId = userId;
+    public Application(String opportunityId, String opportunityTitle, String organizationName,
+                      String volunteerId, String volunteerName, String volunteerEmail,
+                      String organizerId, String message) {
         this.opportunityId = opportunityId;
         this.opportunityTitle = opportunityTitle;
-        this.organizationId = organizationId;
         this.organizationName = organizationName;
-        this.organizationImageUrl = organizationImageUrl;
-        this.status = status.name();
-        this.coverLetter = coverLetter;
-        this.createdAt = appliedDate != null ? appliedDate.getTime() : System.currentTimeMillis();
-        this.updatedAt = this.createdAt;
+        this.volunteerId = volunteerId;
+        this.volunteerName = volunteerName;
+        this.volunteerEmail = volunteerEmail;
+        this.organizerId = organizerId;
+        this.message = message;
+        this.status = "pending";
+        this.appliedDate = new Date();
     }
 
-    @Exclude
     public String getId() {
         return id;
     }
 
-    @Exclude
     public void setId(String id) {
         this.id = id;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
     }
 
     public String getOpportunityId() {
@@ -109,14 +59,6 @@ public class Application {
         this.opportunityTitle = opportunityTitle;
     }
 
-    public String getOrganizationId() {
-        return organizationId;
-    }
-
-    public void setOrganizationId(String organizationId) {
-        this.organizationId = organizationId;
-    }
-
     public String getOrganizationName() {
         return organizationName;
     }
@@ -125,12 +67,44 @@ public class Application {
         this.organizationName = organizationName;
     }
 
-    public String getOrganizationImageUrl() {
-        return organizationImageUrl;
+    public String getVolunteerId() {
+        return volunteerId;
     }
 
-    public void setOrganizationImageUrl(String organizationImageUrl) {
-        this.organizationImageUrl = organizationImageUrl;
+    public void setVolunteerId(String volunteerId) {
+        this.volunteerId = volunteerId;
+    }
+
+    public String getVolunteerName() {
+        return volunteerName;
+    }
+
+    public void setVolunteerName(String volunteerName) {
+        this.volunteerName = volunteerName;
+    }
+
+    public String getVolunteerEmail() {
+        return volunteerEmail;
+    }
+
+    public void setVolunteerEmail(String volunteerEmail) {
+        this.volunteerEmail = volunteerEmail;
+    }
+
+    public String getOrganizerId() {
+        return organizerId;
+    }
+
+    public void setOrganizerId(String organizerId) {
+        this.organizerId = organizerId;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 
     public String getStatus() {
@@ -139,7 +113,14 @@ public class Application {
 
     public void setStatus(String status) {
         this.status = status;
-        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public Date getAppliedDate() {
+        return appliedDate;
+    }
+
+    public void setAppliedDate(Date appliedDate) {
+        this.appliedDate = appliedDate;
     }
 
     @Exclude
@@ -147,39 +128,17 @@ public class Application {
         return Status.fromString(status);
     }
 
-    @Exclude
-    public void setStatusEnum(Status status) {
-        this.status = status.name();
-        this.updatedAt = System.currentTimeMillis();
-    }
+    public enum Status {
+        PENDING,
+        ACCEPTED,
+        REJECTED;
 
-    public String getCoverLetter() {
-        return coverLetter;
-    }
-
-    public void setCoverLetter(String coverLetter) {
-        this.coverLetter = coverLetter;
-        this.updatedAt = System.currentTimeMillis();
-    }
-
-    public long getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(long createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public long getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(long updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    @Exclude
-    public Date getAppliedDate() {
-        return new Date(createdAt);
+        public static Status fromString(String status) {
+            try {
+                return Status.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return PENDING;
+            }
+        }
     }
 } 

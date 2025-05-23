@@ -3,44 +3,28 @@ package com.example.vohoportunitysconect.adapters;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
-import com.bumptech.glide.Glide;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.models.Application;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.chip.Chip;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.ApplicationViewHolder> {
     private List<Application> applications;
     private OnApplicationClickListener listener;
-    private SimpleDateFormat dateFormat;
-    private final DatabaseReference databaseRef;
-    private final String userId;
+    private boolean isOrganizer;
 
     public interface OnApplicationClickListener {
-        void onApplicationClick(Application application);
+        void onAcceptClick(Application application);
+        void onRejectClick(Application application);
+        void onCancelClick(Application application);
     }
 
-    public ApplicationAdapter(List<Application> applications, OnApplicationClickListener listener) {
+    public ApplicationAdapter(List<Application> applications, OnApplicationClickListener listener, boolean isOrganizer) {
         this.applications = applications;
         this.listener = listener;
-        this.dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-        this.userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        this.databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+        this.isOrganizer = isOrganizer;
     }
 
     @NonNull
@@ -68,91 +52,56 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
     }
 
     class ApplicationViewHolder extends RecyclerView.ViewHolder {
-        private ImageView organizationImage;
-        private TextView titleText;
-        private TextView organizationText;
-        private TextView appliedDateText;
-        private Chip statusChip;
-        private MaterialButton cancelButton;
+        private TextView volunteerName;
+        private TextView volunteerEmail;
+        private TextView applicationStatus;
+        private TextView applicationMessage;
+        private View actionButtons;
+        private View acceptButton;
+        private View rejectButton;
 
         public ApplicationViewHolder(@NonNull View itemView) {
             super(itemView);
-            organizationImage = itemView.findViewById(R.id.organization_image);
-            titleText = itemView.findViewById(R.id.title_text);
-            organizationText = itemView.findViewById(R.id.organization_text);
-            appliedDateText = itemView.findViewById(R.id.applied_date_text);
-            statusChip = itemView.findViewById(R.id.status_chip);
-            cancelButton = itemView.findViewById(R.id.cancel_button);
-
-            itemView.setOnClickListener(v -> {
-                int position = getBindingAdapterPosition();
-                if (position != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onApplicationClick(applications.get(position));
-                }
-            });
-
-            cancelButton.setOnClickListener(v -> {
-                int position = getBindingAdapterPosition();
-                if (position != RecyclerView.NO_POSITION) {
-                    Application application = applications.get(position);
-                    cancelApplication(application);
-                }
-            });
-        }
-
-        private void cancelApplication(Application application) {
-            databaseRef.child("applications")
-                .child(userId)
-                .child(application.getOpportunityId())
-                .removeValue()
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(itemView.getContext(), "Application cancelled", Toast.LENGTH_SHORT).show();
-                    // Remove from local list
-                    int position = getBindingAdapterPosition();
-                    if (position != RecyclerView.NO_POSITION) {
-                        applications.remove(position);
-                        notifyItemRemoved(position);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(itemView.getContext(), "Error cancelling application: " + e.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
-                });
+            volunteerName = itemView.findViewById(R.id.volunteer_name);
+            volunteerEmail = itemView.findViewById(R.id.volunteer_email);
+            applicationStatus = itemView.findViewById(R.id.application_status);
+            applicationMessage = itemView.findViewById(R.id.application_message);
+            actionButtons = itemView.findViewById(R.id.action_buttons);
+            acceptButton = itemView.findViewById(R.id.accept_button);
+            rejectButton = itemView.findViewById(R.id.reject_button);
         }
 
         public void bind(Application application) {
-            // Load organization image
-            if (application.getOrganizationImageUrl() != null && !application.getOrganizationImageUrl().isEmpty()) {
-                Glide.with(itemView.getContext())
-                        .load(application.getOrganizationImageUrl())
-                        .placeholder(R.drawable.placeholder_organization)
-                        .error(R.drawable.placeholder_organization)
-                        .into(organizationImage);
+            if (isOrganizer) {
+                volunteerName.setText(application.getVolunteerName());
+                volunteerEmail.setText(application.getVolunteerEmail());
+                actionButtons.setVisibility(View.VISIBLE);
+            } else {
+                volunteerName.setText(application.getOpportunityTitle());
+                volunteerEmail.setText(application.getOrganizationName());
+                actionButtons.setVisibility(View.GONE);
             }
 
-            // Set text fields
-            titleText.setText(application.getOpportunityTitle());
-            organizationText.setText(application.getOrganizationName());
-            appliedDateText.setText("Applied: " + dateFormat.format(application.getAppliedDate()));
+            applicationStatus.setText(application.getStatus());
+            applicationMessage.setText(application.getMessage());
 
-            // Set status chip
-            switch (application.getStatusEnum()) {
-                case PENDING:
-                    statusChip.setText(R.string.pending);
-                    statusChip.setChipBackgroundColorResource(R.color.status_pending);
-                    cancelButton.setVisibility(View.VISIBLE);
-                    cancelButton.setText(R.string.cancel);
+            // Set status color based on application status
+            switch (application.getStatus().toLowerCase()) {
+                case "pending":
+                    applicationStatus.setTextColor(itemView.getContext().getColor(R.color.status_pending));
                     break;
-                case ACCEPTED:
-                    statusChip.setText(R.string.accepted);
-                    statusChip.setChipBackgroundColorResource(R.color.status_accepted);
-                    cancelButton.setVisibility(View.GONE);
+                case "accepted":
+                    applicationStatus.setTextColor(itemView.getContext().getColor(R.color.status_accepted));
                     break;
-                case REJECTED:
-                    statusChip.setText(R.string.rejected);
-                    statusChip.setChipBackgroundColorResource(R.color.status_rejected);
-                    cancelButton.setVisibility(View.GONE);
+                case "rejected":
+                    applicationStatus.setTextColor(itemView.getContext().getColor(R.color.status_rejected));
                     break;
+            }
+
+            // Set up click listeners
+            if (isOrganizer) {
+                acceptButton.setOnClickListener(v -> listener.onAcceptClick(application));
+                rejectButton.setOnClickListener(v -> listener.onRejectClick(application));
             }
         }
     }

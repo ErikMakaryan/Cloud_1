@@ -9,6 +9,7 @@ public class Certificate {
     private String id;
     private String name;
     private String fileUrl;
+    private String filePath;
     private long uploadDate;
 
     // Default constructor for Firebase
@@ -47,6 +48,14 @@ public class Certificate {
 
     public void setFileUrl(String fileUrl) {
         this.fileUrl = fileUrl;
+    }
+
+    public String getFilePath() {
+        return filePath;
+    }
+
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
     }
 
     public long getUploadDate() {

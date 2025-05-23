@@ -25,17 +25,17 @@
                 android:padding="8dp">
 
                 <ImageView
-                    android:layout_width="24dp"
+                    android:layout_width="21dp"
                     android:layout_height="24dp"
-                    android:src="@drawable/ic_back"
-                    android:contentDescription="@string/back" />
+                    android:contentDescription="@string/back"
+                    android:src="@drawable/ic_back" />
 
                 <TextView
                     android:id="@+id/backButtonText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:textColor="@android:color/black"
+                    android:textColor="@color/white"
                     android:textSize="16sp" />
 
             </LinearLayout>

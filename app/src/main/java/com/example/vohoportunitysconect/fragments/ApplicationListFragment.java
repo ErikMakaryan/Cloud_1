@@ -1,5 +1,6 @@
 package com.example.vohoportunitysconect.fragments;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,7 +29,7 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ApplicationListFragment extends Fragment {
+public class ApplicationListFragment extends Fragment implements ApplicationAdapter.OnApplicationClickListener {
     private static final String ARG_STATUS = "status";
     private RecyclerView recyclerView;
     private ApplicationAdapter adapter;
@@ -37,11 +38,13 @@ public class ApplicationListFragment extends Fragment {
     private FirebaseAuth auth;
     private Application.Status status;
     private ValueEventListener valueEventListener;
+    private boolean isOrganizer;
 
-    public static ApplicationListFragment newInstance(Application.Status status) {
+    public static ApplicationListFragment newInstance(Application.Status status, boolean isOrganizer) {
         ApplicationListFragment fragment = new ApplicationListFragment();
         Bundle args = new Bundle();
         args.putString(ARG_STATUS, status.name());
+        args.putBoolean("isOrganizer", isOrganizer);
         fragment.setArguments(args);
         return fragment;
     }
@@ -52,6 +55,7 @@ public class ApplicationListFragment extends Fragment {
         if (getArguments() != null) {
             String statusValue = getArguments().getString(ARG_STATUS);
             status = Application.Status.fromString(statusValue);
+            isOrganizer = getArguments().getBoolean("isOrganizer", false);
         }
     }
 
@@ -73,10 +77,7 @@ public class ApplicationListFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
-        adapter = new ApplicationAdapter(applications, application -> {
-            // Handle application click
-            Toast.makeText(getContext(), "Clicked: " + application.getOpportunityTitle(), Toast.LENGTH_SHORT).show();
-        });
+        adapter = new ApplicationAdapter(applications, this, isOrganizer);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerView.setAdapter(adapter);
     }
@@ -97,6 +98,7 @@ public class ApplicationListFragment extends Fragment {
         }
 
         valueEventListener = new ValueEventListener() {
+            @SuppressLint("NotifyDataSetChanged")
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 if (!isAdded() || getContext() == null) return;
@@ -137,6 +139,41 @@ public class ApplicationListFragment extends Fragment {
         if (databaseRef != null && valueEventListener != null) {
             databaseRef.removeEventListener(valueEventListener);
             valueEventListener = null;
+        }
+    }
+
+    @Override
+    public void onAcceptClick(Application application) {
+        updateApplicationStatus(application, "accepted");
+    }
+
+    @Override
+    public void onRejectClick(Application application) {
+        updateApplicationStatus(application, "rejected");
+    }
+
+    @Override
+    public void onCancelClick(Application application) {
+        if (!isOrganizer) {
+            databaseRef.child("applications").child(application.getVolunteerId())
+                    .child(application.getOpportunityId())
+                    .removeValue();
+        }
+    }
+
+    private void updateApplicationStatus(Application application, String status) {
+        if (isOrganizer) {
+            // Update in organizer's applications
+            databaseRef.child("organizer_applications").child(application.getOrganizerId())
+                    .child(application.getOpportunityId())
+                    .child("status")
+                    .setValue(status);
+
+            // Update in volunteer's applications
+            databaseRef.child("applications").child(application.getVolunteerId())
+                    .child(application.getOpportunityId())
+                    .child("status")
+                    .setValue(status);
         }
     }
 } 

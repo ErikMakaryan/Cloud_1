@@ -71,5 +71,6 @@
     <color name="selection_light">#F5F5F5</color>
     <color name="urgent_red">#FFE53935</color>
     <color name="orange">#FFA500</color>
+    <color name="green">#4CAF50</color>
 </resources>
    

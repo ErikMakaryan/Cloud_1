@@ -15,6 +15,7 @@ import com.example.vohoportunitysconect.MainActivity;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.databinding.FragmentOpportunityDetailsBinding;
 import com.example.vohoportunitysconect.models.Opportunity;
+import com.example.vohoportunitysconect.utils.EmailUtils;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -191,6 +192,30 @@ public class OpportunityDetailsFragment extends Fragment {
                             Toast.LENGTH_SHORT).show();
                         binding.applyButton.setText(R.string.applied);
                         binding.applyButton.setEnabled(false);
+
+                        // Get organizer's email and send notification
+                        databaseRef.child("users").child(opportunity.getOrganizationId())
+                            .child("email")
+                            .get()
+                            .addOnSuccessListener(snapshot -> {
+                                String organizerEmail = snapshot.getValue(String.class);
+                                if (organizerEmail != null && !organizerEmail.isEmpty()) {
+                                    String subject = "New Application: " + opportunity.getTitle();
+                                    String body = String.format(
+                                        "Hello,\n\n" +
+                                        "A new application has been submitted for your opportunity:\n\n" +
+                                        "Opportunity: %s\n" +
+                                        "Applicant: %s\n\n" +
+                                        "Please review the application in your dashboard.\n\n" +
+                                        "Best regards,\n" +
+                                        "VOH Opportunities Connect",
+                                        opportunity.getTitle(),
+                                        mAuth.getCurrentUser().getEmail()
+                                    );
+                                    
+                                    EmailUtils.sendEmail(requireContext(), organizerEmail, subject, body);
+                                }
+                            });
                     })
                     .addOnFailureListener(e -> {
                         Toast.makeText(getContext(), "Error submitting application: " + e.getMessage(), 

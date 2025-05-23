@@ -1,5 +1,10 @@
 package com.example.vohoportunitysconect.ui.profile;
 
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -7,6 +12,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,20 +44,32 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 
 public class ProfileFragment extends Fragment {
     private ShapeableImageView profileImage;
-    private TextView nameText, emailText, hoursText, volunteerHoursText, opportunitiesText, applicationsCount;
-    private MaterialButton editProfileButton, settingsButton, signOutButton, addHoursButton, createOpportunityButton;
+    private TextView nameText, emailText, hoursText, applicationsCount;
+    private MaterialButton editProfileButton, settingsButton, signOutButton, addHoursButton, deleteHoursButton, addCertificateButton;
     private FirebaseAuth mAuth;
     private DatabaseReference databaseRef;
     private StorageReference storageRef;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private ActivityResultLauncher<Intent> certificatePickerLauncher;
     private Uri selectedFileUri;
-    private CertificateAdapter adapter;
+    private String pendingCertificateName;
+    private RecyclerView certificatesRecyclerView;
+    private CertificateAdapter certificateAdapter;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -69,8 +87,22 @@ public class ProfileFragment extends Fragment {
                     }
                 }
         );
+
+        certificatePickerLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    Uri certificateUri = result.getData().getData();
+                    if (certificateUri != null && pendingCertificateName != null) {
+                        uploadCertificate(certificateUri, pendingCertificateName);
+                        pendingCertificateName = null;
+                    }
+                }
+            }
+        );
     }
 
+    @SuppressLint({"CutPasteId", "MissingInflatedId"})
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -80,54 +112,25 @@ public class ProfileFragment extends Fragment {
         nameText = root.findViewById(R.id.name_text);
         emailText = root.findViewById(R.id.email_text);
         hoursText = root.findViewById(R.id.hours_text);
-        volunteerHoursText = root.findViewById(R.id.volunteer_hours_text);
-        opportunitiesText = root.findViewById(R.id.opportunities_text);
         applicationsCount = root.findViewById(R.id.applications_count);
-        editProfileButton = root.findViewById(R.id.edit_profile_button);
+        editProfileButton = root.findViewById(R.id.add_hours_button);
         settingsButton = root.findViewById(R.id.settings_button);
         signOutButton = root.findViewById(R.id.sign_out_button);
         addHoursButton = root.findViewById(R.id.add_hours_button);
-        createOpportunityButton = root.findViewById(R.id.create_opportunity_button);
+        deleteHoursButton = root.findViewById(R.id.delete_hours_button);
+        addCertificateButton = root.findViewById(R.id.add_certificate_button);
+        certificatesRecyclerView = root.findViewById(R.id.certificates_recycler_view);
+
+        // Setup RecyclerView for certificates
+        certificatesRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        certificateAdapter = new CertificateAdapter(new ArrayList<>());
+        certificatesRecyclerView.setAdapter(certificateAdapter);
 
         setupClickListeners();
         checkAuthAndLoadData();
+        loadCertificates(); // Load certificates when fragment is created
 
         return root;
-    }
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        // Setup RecyclerView
-        adapter = new CertificateAdapter(new ArrayList<>(), new CertificateAdapter.OnCertificateClickListener() {
-            @Override
-            public void onCertificateClick(Certificate certificate) {
-                // Open certificate file
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setData(Uri.parse(certificate.getFileUrl()));
-                startActivity(intent);
-            }
-
-            @Override
-            public void onDeleteClick(Certificate certificate) {
-                showDeleteConfirmationDialog(certificate);
-            }
-        });
-
-        RecyclerView certificatesRecyclerView = view.findViewById(R.id.certificates_recycler_view);
-        certificatesRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        certificatesRecyclerView.setAdapter(adapter);
-
-        // Setup add certificate button
-        view.findViewById(R.id.add_certificate_button).setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-            intent.setType("application/pdf");
-            imagePickerLauncher.launch(intent);
-        });
-
-        // Load certificates
-        loadCertificates();
     }
 
     private void checkAuthAndLoadData() {
@@ -161,11 +164,25 @@ public class ProfileFragment extends Fragment {
 
         signOutButton.setOnClickListener(v -> {
             if (mAuth.getCurrentUser() != null) {
+                // Sign out from Firebase
                 mAuth.signOut();
+                
+                // Clear any stored credentials or preferences
+                if (getActivity() != null) {
+                    getActivity().getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .clear()
+                        .apply();
+                }
+                
                 Toast.makeText(getContext(), "Signed out successfully", Toast.LENGTH_SHORT).show();
+                
+                // Create a new task and clear all previous activities
                 Intent intent = new Intent(getContext(), LoginActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 startActivity(intent);
+                
+                // Finish the current activity
                 if (getActivity() != null) {
                     getActivity().finish();
                 }
@@ -184,16 +201,29 @@ public class ProfileFragment extends Fragment {
             }
         });
 
-        createOpportunityButton.setOnClickListener(v -> {
+        addHoursButton.setOnClickListener(v -> {
             if (mAuth.getCurrentUser() != null) {
-                startActivity(new Intent(getContext(), CreateOpportunityActivity.class));
+                showAddHoursDialog();
             } else {
-                Toast.makeText(getContext(), "Please sign in to create an opportunity", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Please sign in to add hours", Toast.LENGTH_SHORT).show();
             }
         });
 
-        // Remove the add hours button click listener since only organizations can add hours
-        addHoursButton.setVisibility(View.GONE);
+        deleteHoursButton.setOnClickListener(v -> {
+            if (mAuth.getCurrentUser() != null) {
+                showDeleteHoursDialog();
+            } else {
+                Toast.makeText(getContext(), "Please sign in to delete hours", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        addCertificateButton.setOnClickListener(v -> {
+            if (mAuth.getCurrentUser() != null) {
+                showAddCertificateDialog();
+            } else {
+                Toast.makeText(getContext(), "Please sign in to add certificates", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void loadUserData() {
@@ -211,33 +241,57 @@ public class ProfileFragment extends Fragment {
                         Long hours = dataSnapshot.child("volunteerHours").getValue(Long.class);
                         hoursText.setText(hours != null ? String.valueOf(hours) : "0");
                         
-                        Long opportunities = dataSnapshot.child("completedOpportunitiesCount").getValue(Long.class);
-                        opportunitiesText.setText(opportunities != null ? String.valueOf(opportunities) : "0");
+                        // Load pending applications count
+                        databaseRef.child("applications")
+                            .orderByChild("userId")
+                            .equalTo(userId)
+                            .addListenerForSingleValueEvent(new ValueEventListener() {
+                                @Override
+                                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                                    int pendingCount = 0;
+                                    for (DataSnapshot appSnapshot : snapshot.getChildren()) {
+                                        String status = appSnapshot.child("status").getValue(String.class);
+                                        if ("pending".equals(status)) {
+                                            pendingCount++;
+                                        }
+                                    }
+                                    applicationsCount.setText(String.valueOf(pendingCount));
+                                }
+
+                                @Override
+                                public void onCancelled(@NonNull DatabaseError error) {
+                                    applicationsCount.setText("0");
+                                }
+                            });
                         
                         // Check if user is an organization
                         Boolean isOrganization = dataSnapshot.child("isOrganization").getValue(Boolean.class);
                         if (isOrganization != null && isOrganization) {
-                            createOpportunityButton.setVisibility(View.VISIBLE);
                             addHoursButton.setVisibility(View.GONE);
+                            deleteHoursButton.setVisibility(View.GONE);
                         } else {
-                            createOpportunityButton.setVisibility(View.GONE);
                             addHoursButton.setVisibility(View.VISIBLE);
+                            deleteHoursButton.setVisibility(View.VISIBLE);
                         }
                         
                         // Load profile image
-                        String imageUrl = dataSnapshot.child("profileImageUrl").getValue(String.class);
-                        if (imageUrl != null && !imageUrl.isEmpty()) {
+                        File imageFile = new File(requireContext().getFilesDir(), "profile_" + userId + ".jpg");
+                        if (imageFile.exists()) {
                             Glide.with(ProfileFragment.this)
-                                .load(imageUrl)
+                                .load(imageFile)
                                 .placeholder(R.drawable.placeholder_profile)
+                                .into(profileImage);
+                        } else {
+                            Glide.with(ProfileFragment.this)
+                                .load(R.drawable.placeholder_profile)
                                 .into(profileImage);
                         }
                     }
                 }
 
                 @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Toast.makeText(getContext(), "Error loading user data", Toast.LENGTH_SHORT).show();
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(getContext(), "Error loading profile data", Toast.LENGTH_SHORT).show();
                 }
             });
         }
@@ -246,87 +300,313 @@ public class ProfileFragment extends Fragment {
     private void uploadProfileImage(Uri imageUri) {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
-            StorageReference userImageRef = storageRef.child(userId + ".jpg");
-
-            userImageRef.putFile(imageUri)
-                    .addOnSuccessListener(taskSnapshot -> userImageRef.getDownloadUrl().addOnSuccessListener(uri -> updateUserProfileImage(uri.toString())))
-                    .addOnFailureListener(e -> Toast.makeText(getContext(), "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            try {
+                // Get the input stream from the URI
+                InputStream inputStream = requireContext().getContentResolver().openInputStream(imageUri);
+                if (inputStream != null) {
+                    // Create a file in the app's private storage
+                    File imageFile = new File(requireContext().getFilesDir(), "profile_" + userId + ".jpg");
+                    FileOutputStream outputStream = new FileOutputStream(imageFile);
+                    
+                    // Copy the image data
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                    
+                    // Close streams
+                    inputStream.close();
+                    outputStream.close();
+                    
+                    // Update the UI
+                    Glide.with(this)
+                        .load(imageFile)
+                        .placeholder(R.drawable.placeholder_profile)
+                        .into(profileImage);
+                    
+                    Toast.makeText(getContext(), "Profile picture updated!", Toast.LENGTH_SHORT).show();
+                    
+                    // Show options to change or remove profile picture
+                    showProfilePictureOptions();
+                }
+            } catch (IOException e) {
+                Toast.makeText(getContext(), "Error saving profile picture: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
-    private void updateUserProfileImage(String imageUrl) {
+    private void showProfilePictureOptions() {
+        String[] options = {"Change Picture", "Remove Picture"};
+        new AlertDialog.Builder(requireContext())
+            .setTitle("Profile Picture")
+            .setItems(options, (dialog, which) -> {
+                if (which == 0) {
+                    // Change Picture
+                    Intent intent = new Intent(Intent.ACTION_PICK);
+                    intent.setType("image/*");
+                    imagePickerLauncher.launch(intent);
+                } else {
+                    // Remove Picture
+                    removeProfilePicture();
+                }
+            })
+            .show();
+    }
+
+    private void removeProfilePicture() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
-            databaseRef.child("users").child(userId)
-                    .child("profileImageUrl")
-                    .setValue(imageUrl)
-                    .addOnSuccessListener(aVoid -> {
-                        Glide.with(this).load(imageUrl).into(profileImage);
-                        Toast.makeText(getContext(), "Profile picture updated!", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener(e -> Toast.makeText(getContext(), "Error updating image: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            File imageFile = new File(requireContext().getFilesDir(), "profile_" + userId + ".jpg");
+            if (imageFile.exists()) {
+                imageFile.delete();
+            }
+            Glide.with(this)
+                .load(R.drawable.placeholder_profile)
+                .into(profileImage);
+            Toast.makeText(getContext(), "Profile picture removed", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void showDeleteConfirmationDialog(Certificate certificate) {
+    @SuppressLint("SetTextI18n")
+    private void uploadCertificate(Uri certificateUri, String name) {
+        if (mAuth.getCurrentUser() != null) {
+            String userId = mAuth.getCurrentUser().getUid();
+            
+            // Show loading dialog
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
+            View dialogView = getLayoutInflater().inflate(R.layout.dialog_loading, null);
+            TextView messageText = dialogView.findViewById(R.id.message_text);
+            messageText.setText("Uploading certificate...");
+            builder.setView(dialogView);
+            builder.setCancelable(false);
+            androidx.appcompat.app.AlertDialog loadingDialog = builder.create();
+            loadingDialog.show();
+
+            try {
+                // Create certificates directory if it doesn't exist
+                File certificatesDir = new File(requireContext().getFilesDir(), "certificates");
+                if (!certificatesDir.exists()) {
+                    certificatesDir.mkdirs();
+                }
+
+                // Create a unique filename for the certificate
+                String fileName = "cert_" + userId + "_" + System.currentTimeMillis() + ".pdf";
+                File certificateFile = new File(certificatesDir, fileName);
+
+                // Copy the certificate file
+                InputStream inputStream = requireContext().getContentResolver().openInputStream(certificateUri);
+                if (inputStream != null) {
+                    FileOutputStream outputStream = new FileOutputStream(certificateFile);
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                    inputStream.close();
+                    outputStream.close();
+
+                    // Save certificate metadata
+                    Certificate certificate = new Certificate();
+                    certificate.setName(name);
+                    certificate.setFilePath(certificateFile.getAbsolutePath());
+                    certificate.setFileUrl(certificateUri.toString());
+                    certificate.setUploadDate(System.currentTimeMillis());
+
+                    // Add to database
+                    String certificateId = databaseRef.child("users").child(userId).child("certificates").push().getKey();
+                    if (certificateId != null) {
+                        databaseRef.child("users").child(userId).child("certificates").child(certificateId)
+                            .setValue(certificate)
+                            .addOnSuccessListener(aVoid -> {
+                                loadingDialog.dismiss();
+                                Toast.makeText(getContext(), "Certificate uploaded successfully", Toast.LENGTH_SHORT).show();
+                                loadCertificates(); // Refresh certificates list
+                            })
+                            .addOnFailureListener(e -> {
+                                loadingDialog.dismiss();
+                                Toast.makeText(getContext(), "Error uploading certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            });
+                    }
+                } else {
+                    loadingDialog.dismiss();
+                    Toast.makeText(getContext(), "Error reading certificate file", Toast.LENGTH_SHORT).show();
+                }
+            } catch (IOException e) {
+                loadingDialog.dismiss();
+                Toast.makeText(getContext(), "Error saving certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void loadCertificates() {
+        if (mAuth.getCurrentUser() != null) {
+            String userId = mAuth.getCurrentUser().getUid();
+            databaseRef.child("users").child(userId).child("certificates")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        List<Certificate> certificates = new ArrayList<>();
+                        for (DataSnapshot certSnapshot : snapshot.getChildren()) {
+                            Certificate certificate = certSnapshot.getValue(Certificate.class);
+                            if (certificate != null) {
+                                certificate.setId(certSnapshot.getKey());
+                                certificates.add(certificate);
+                            }
+                        }
+                        updateCertificatesList(certificates);
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Toast.makeText(getContext(), "Error loading certificates: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+        }
+    }
+
+    private void updateCertificatesList(List<Certificate> certificates) {
+        if (certificateAdapter != null) {
+            certificateAdapter.updateCertificates(certificates);
+            certificatesRecyclerView.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showAddCertificateDialog() {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_certificate_name, null);
+        TextInputEditText nameInput = dialogView.findViewById(R.id.certificate_name_input);
+
         new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Delete Certificate")
-            .setMessage("Are you sure you want to delete this certificate?")
-            .setPositiveButton("Delete", (dialog, which) -> deleteCertificate(certificate))
+            .setTitle("Add Certificate")
+            .setView(dialogView)
+            .setPositiveButton("Upload", (dialog, which) -> {
+                String name = nameInput.getText().toString().trim();
+                if (!name.isEmpty()) {
+                    pendingCertificateName = name;
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("application/pdf");
+                    certificatePickerLauncher.launch(intent);
+                } else {
+                    Toast.makeText(getContext(), "Please enter a certificate name", Toast.LENGTH_SHORT).show();
+                }
+            })
             .setNegativeButton("Cancel", null)
             .show();
     }
 
-    private void deleteCertificate(Certificate certificate) {
-        if (mAuth.getCurrentUser() == null) return;
+    private void showAddHoursDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_hours, null);
+        EditText hoursInput = dialogView.findViewById(R.id.hours_input);
 
-        // Show progress
-        Toast.makeText(requireContext(), "Deleting certificate...", Toast.LENGTH_SHORT).show();
-
-        // Delete from Storage
-        StorageReference storageRef = FirebaseStorage.getInstance().getReferenceFromUrl(certificate.getFileUrl());
-        storageRef.delete()
-            .addOnSuccessListener(aVoid -> {
-                // Delete from Database
-                String userId = mAuth.getCurrentUser().getUid();
-                databaseRef.child("users").child(userId).child("certificates").child(certificate.getId()).removeValue()
-                    .addOnSuccessListener(aVoid2 -> {
-                        Toast.makeText(requireContext(), "Certificate deleted successfully", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(requireContext(), "Failed to delete certificate", Toast.LENGTH_SHORT).show();
-                    });
+        builder.setView(dialogView)
+            .setTitle("Add Hours")
+            .setPositiveButton("Add", (dialog, which) -> {
+                String hoursStr = hoursInput.getText().toString();
+                if (!hoursStr.isEmpty()) {
+                    try {
+                        double hours = Double.parseDouble(hoursStr);
+                        if (hours > 0) {
+                            addHours(hours);
+                        } else {
+                            Toast.makeText(getContext(), "Please enter a positive number", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(getContext(), "Please enter a valid number", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(getContext(), "Please enter hours", Toast.LENGTH_SHORT).show();
+                }
             })
-            .addOnFailureListener(e -> {
-                Toast.makeText(requireContext(), "Failed to delete certificate file", Toast.LENGTH_SHORT).show();
-            });
+            .setNegativeButton("Cancel", null);
+
+        builder.create().show();
     }
 
-    private void loadCertificates() {
-        if (mAuth.getCurrentUser() == null) return;
+    private void showDeleteHoursDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_hours, null);
+        EditText hoursInput = dialogView.findViewById(R.id.hours_input);
 
-        String userId = mAuth.getCurrentUser().getUid();
-        databaseRef.child("users")
-            .child(userId)
-            .child("certificates")
-            .addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    List<Certificate> certificates = new ArrayList<>();
-                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
-                        Certificate certificate = snapshot.getValue(Certificate.class);
-                        if (certificate != null) {
-                            certificate.setId(snapshot.getKey());
-                            certificates.add(certificate);
-                        }
+        builder.setView(dialogView)
+            .setTitle("Delete Volunteer Hours")
+            .setPositiveButton("Delete", (dialog, which) -> {
+                String hoursStr = hoursInput.getText().toString();
+                
+                if (!hoursStr.isEmpty()) {
+                    try {
+                        double hours = Double.parseDouble(hoursStr);
+                        String userId = mAuth.getCurrentUser().getUid();
+                        
+                        // Update volunteer hours in Firebase
+                        databaseRef.child("users").child(userId).child("volunteerHours")
+                            .get().addOnSuccessListener(snapshot -> {
+                                double currentHours = 0;
+                                if (snapshot.getValue() != null) {
+                                    currentHours = ((Number) snapshot.getValue()).doubleValue();
+                                }
+                                
+                                // Check if trying to delete more hours than available
+                                if (hours > currentHours) {
+                                    Toast.makeText(getContext(), 
+                                        "Cannot delete more hours than you have (" + currentHours + " hours available)", 
+                                        Toast.LENGTH_LONG).show();
+                                    return;
+                                }
+                                
+                                // Ensure we don't go below 0 hours
+                                double newHours = Math.max(0, currentHours - hours);
+                                
+                                Map<String, Object> updates = new HashMap<>();
+                                updates.put("volunteerHours", newHours);
+                                
+                                databaseRef.child("users").child(userId)
+                                    .updateChildren(updates)
+                                    .addOnSuccessListener(aVoid -> {
+                                        Toast.makeText(getContext(), "Hours deleted successfully", Toast.LENGTH_SHORT).show();
+                                        loadUserData(); // Refresh the profile data
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Toast.makeText(getContext(), "Error deleting hours", Toast.LENGTH_SHORT).show();
+                                    });
+                            });
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(getContext(), "Please enter a valid number", Toast.LENGTH_SHORT).show();
                     }
-                    adapter.updateCertificates(certificates);
+                } else {
+                    Toast.makeText(getContext(), "Please enter hours", Toast.LENGTH_SHORT).show();
                 }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Toast.makeText(requireContext(), "Error loading certificates: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            });
+    private void addHours(double hours) {
+        if (mAuth.getCurrentUser() != null) {
+            String userId = mAuth.getCurrentUser().getUid();
+            
+            // Update volunteer hours in Firebase
+            databaseRef.child("users").child(userId).child("volunteerHours")
+                .get().addOnSuccessListener(snapshot -> {
+                    double currentHours = 0;
+                    if (snapshot.getValue() != null) {
+                        currentHours = ((Number) snapshot.getValue()).doubleValue();
+                    }
+                    
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("volunteerHours", currentHours + hours);
+                    
+                    databaseRef.child("users").child(userId)
+                        .updateChildren(updates)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(getContext(), "Hours added successfully", Toast.LENGTH_SHORT).show();
+                            loadUserData(); // Refresh the profile data
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(getContext(), "Error adding hours", Toast.LENGTH_SHORT).show();
+                        });
+                });
+        }
     }
 } 

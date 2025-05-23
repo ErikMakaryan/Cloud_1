@@ -9,14 +9,11 @@ import com.example.vohoportunitysconect.fragments.ApplicationListFragment;
 import com.example.vohoportunitysconect.models.Application;
 
 public class ApplicationsPagerAdapter extends FragmentStateAdapter {
-    private static final int PAGE_COUNT = 3;
+    private final boolean isOrganizer;
 
-    public ApplicationsPagerAdapter(@NonNull FragmentActivity fragmentActivity) {
+    public ApplicationsPagerAdapter(@NonNull FragmentActivity fragmentActivity, boolean isOrganizer) {
         super(fragmentActivity);
-    }
-
-    public ApplicationsPagerAdapter(@NonNull Fragment fragment) {
-        super(fragment);
+        this.isOrganizer = isOrganizer;
     }
 
     @NonNull
@@ -37,11 +34,11 @@ public class ApplicationsPagerAdapter extends FragmentStateAdapter {
             default:
                 status = Application.Status.PENDING;
         }
-        return ApplicationListFragment.newInstance(status);
+        return ApplicationListFragment.newInstance(status, isOrganizer);
     }
 
     @Override
     public int getItemCount() {
-        return PAGE_COUNT;
+        return 3; // Pending, Accepted, Rejected
     }
 } 
