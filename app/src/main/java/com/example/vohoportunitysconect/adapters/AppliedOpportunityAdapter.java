@@ -13,7 +13,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.ViewHolder> {
+public class AppliedOpportunityAdapter extends RecyclerView.Adapter<AppliedOpportunityAdapter.ViewHolder> {
     private List<Application> applications;
     private OnItemClickListener listener;
     private SimpleDateFormat dateFormat;
@@ -22,7 +22,7 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
         void onItemClick(Application application);
     }
 
-    public ApplicationAdapter(List<Application> applications, OnItemClickListener listener) {
+    public AppliedOpportunityAdapter(List<Application> applications, OnItemClickListener listener) {
         this.applications = applications;
         this.listener = listener;
         this.dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
@@ -32,7 +32,7 @@ public class ApplicationAdapter extends RecyclerView.Adapter<ApplicationAdapter.
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_application, parent, false);
+                .inflate(R.layout.item_applied_opportunity, parent, false);
         return new ViewHolder(view);
     }
 

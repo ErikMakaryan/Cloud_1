@@ -28,10 +28,7 @@ public class SettingsActivity extends AppCompatActivity {
     private MaterialButton changePasswordButton;
     private MaterialButton deleteAccountButton;
     private MaterialButton addOpportunityButton;
-    private SwitchMaterial notificationsSwitch;
-    private SwitchMaterial emailNotificationsSwitch;
     private SwitchMaterial darkModeSwitch;
-    private SwitchMaterial locationServicesSwitch;
     private MaterialButton returnButton;
     
     private FirebaseAuth mAuth;
@@ -53,7 +50,6 @@ public class SettingsActivity extends AppCompatActivity {
         // Initialize views
         initializeViews();
         setupClickListeners();
-        loadUserSettings();
         loadAppSettings();
     }
 
@@ -61,10 +57,7 @@ public class SettingsActivity extends AppCompatActivity {
         changePasswordButton = findViewById(R.id.change_password_button);
         deleteAccountButton = findViewById(R.id.delete_account_button);
         addOpportunityButton = findViewById(R.id.add_opportunity_button);
-        notificationsSwitch = findViewById(R.id.notifications_switch);
-        emailNotificationsSwitch = findViewById(R.id.email_notifications_switch);
         darkModeSwitch = findViewById(R.id.dark_mode_switch);
-        locationServicesSwitch = findViewById(R.id.location_services_switch);
         returnButton = findViewById(R.id.return_button);
     }
 
@@ -93,28 +86,9 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
-        notificationsSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (currentUser != null) {
-                saveNotificationSettings(isChecked, emailNotificationsSwitch.isChecked());
-            }
-        });
-
-        emailNotificationsSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (currentUser != null) {
-                saveNotificationSettings(notificationsSwitch.isChecked(), isChecked);
-            }
-        });
-
         darkModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             saveDarkModeSetting(isChecked);
             applyDarkMode(isChecked);
-        });
-
-        locationServicesSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            saveLocationServicesSetting(isChecked);
-            if (isChecked) {
-                requestLocationPermissions();
-            }
         });
 
         returnButton.setOnClickListener(v -> finish());
@@ -180,77 +154,13 @@ public class SettingsActivity extends AppCompatActivity {
                 });
     }
 
-    private void loadUserSettings() {
-        if (currentUser != null) {
-            String userId = currentUser.getUid();
-            DatabaseReference settingsRef = databaseRef.child("users").child(userId).child("settings");
-            
-            settingsRef.addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
-                @Override
-                public void onDataChange(com.google.firebase.database.DataSnapshot dataSnapshot) {
-                    try {
-                        if (dataSnapshot.exists()) {
-                            Boolean notificationsEnabled = dataSnapshot.child("notificationsEnabled").getValue(Boolean.class);
-                            Boolean emailNotificationsEnabled = dataSnapshot.child("emailNotificationsEnabled").getValue(Boolean.class);
-                            
-                            if (notificationsEnabled != null) {
-                                notificationsSwitch.setChecked(notificationsEnabled);
-                            }
-                            if (emailNotificationsEnabled != null) {
-                                emailNotificationsSwitch.setChecked(emailNotificationsEnabled);
-                            }
-                        } else {
-                            // Initialize default settings if they don't exist
-                            saveNotificationSettings(true, true);
-                        }
-                    } catch (Exception e) {
-                        showSnackbar("Error loading settings: " + e.getMessage());
-                    }
-                }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-                    showSnackbar("Error loading settings: " + databaseError.getMessage());
-                }
-            });
-        }
-    }
-
     private void loadAppSettings() {
         boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
-        boolean isLocationEnabled = sharedPreferences.getBoolean("location_services", false);
-        
         darkModeSwitch.setChecked(isDarkMode);
-        locationServicesSwitch.setChecked(isLocationEnabled);
-    }
-
-    private void saveNotificationSettings(boolean notificationsEnabled, boolean emailNotificationsEnabled) {
-        if (currentUser != null) {
-            String userId = currentUser.getUid();
-            DatabaseReference settingsRef = databaseRef.child("users").child(userId).child("settings");
-            
-            settingsRef.child("notificationsEnabled").setValue(notificationsEnabled)
-                    .addOnSuccessListener(aVoid -> {
-                        settingsRef.child("emailNotificationsEnabled").setValue(emailNotificationsEnabled)
-                                .addOnSuccessListener(aVoid1 -> {
-                                    showSnackbar("Settings saved successfully");
-                                })
-                                .addOnFailureListener(e -> {
-                                    showSnackbar("Error saving email notification settings: " + e.getMessage());
-                                });
-                    })
-                    .addOnFailureListener(e -> {
-                        showSnackbar("Error saving notification settings: " + e.getMessage());
-                    });
-        }
     }
 
     private void saveDarkModeSetting(boolean isEnabled) {
         sharedPreferences.edit().putBoolean("dark_mode", isEnabled).apply();
-    }
-
-    private void saveLocationServicesSetting(boolean isEnabled) {
-        sharedPreferences.edit().putBoolean("location_services", isEnabled).apply();
     }
 
     private void applyDarkMode(boolean isEnabled) {
@@ -259,11 +169,6 @@ public class SettingsActivity extends AppCompatActivity {
         } else {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
         }
-    }
-
-    private void requestLocationPermissions() {
-        // TODO: Implement location permissions request
-        showSnackbar("Location services coming soon!");
     }
 
     private void showDeleteAccountConfirmation() {
@@ -278,27 +183,9 @@ public class SettingsActivity extends AppCompatActivity {
     private void deleteAccount() {
         if (currentUser != null) {
             String userId = currentUser.getUid();
-            
-            // First, delete all user data
             databaseRef.child("users").child(userId).removeValue()
                     .addOnSuccessListener(aVoid -> {
-                        // Then delete the user's applications
-                        databaseRef.child("applications").orderByChild("userId").equalTo(userId)
-                                .addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
-                                    @Override
-                                    public void onDataChange(com.google.firebase.database.DataSnapshot dataSnapshot) {
-                                        for (com.google.firebase.database.DataSnapshot snapshot : dataSnapshot.getChildren()) {
-                                            snapshot.getRef().removeValue();
-                                        }
-                                        // Finally, delete the Firebase Auth account
-                                        deleteFirebaseAccount();
-                                    }
-
-                                    @Override
-                                    public void onCancelled(DatabaseError databaseError) {
-                                        showSnackbar("Error deleting applications: " + databaseError.getMessage());
-                                    }
-                                });
+                        deleteFirebaseAccount();
                     })
                     .addOnFailureListener(e -> {
                         showSnackbar("Error deleting user data: " + e.getMessage());
@@ -310,7 +197,6 @@ public class SettingsActivity extends AppCompatActivity {
         currentUser.delete()
                 .addOnSuccessListener(aVoid -> {
                     showSnackbar("Account deleted successfully");
-                    startActivity(new Intent(this, LoginActivity.class));
                     finish();
                 })
                 .addOnFailureListener(e -> {
@@ -319,6 +205,6 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showSnackbar(String message) {
-        Snackbar.make(findViewById(android.R.id.content), message, Snackbar.LENGTH_LONG).show();
+        Snackbar.make(findViewById(android.R.id.content), message, Snackbar.LENGTH_SHORT).show();
     }
 } 

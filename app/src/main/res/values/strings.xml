@@ -73,7 +73,7 @@
     <string name="profile">Profile</string>
     <string name="opportunity_details">Opportunity Details</string>
     <string name="no_email">No email available</string>
-    <string name="anonymous_user">Anonymous User</string>
+    <string name="anonymous_user">Demo User</string>
     <string name="requirements">Requirements</string>
     <string name="apply">Apply</string>
     <string name="save">Save</string>

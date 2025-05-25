@@ -4,8 +4,10 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import com.example.vohoportunitysconect.BuildConfig;
 import com.example.vohoportunitysconect.models.User;
+import com.example.vohoportunitysconect.models.UserType;
 import com.example.vohoportunitysconect.models.Opportunity;
 import com.example.vohoportunitysconect.models.UserActivity;
+import com.example.vohoportunitysconect.models.Organization;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -647,6 +649,61 @@ public class DatabaseManager {
                         }
                     });
         });
+    }
+
+    public void getOrganization(String organizationId, DatabaseCallback<Organization> callback) {
+        if (!isInitialized) {
+            Log.e(TAG, "DatabaseManager not initialized");
+            callback.onError(new Exception("Database not initialized"));
+            return;
+        }
+
+        if (organizationId == null || organizationId.trim().isEmpty()) {
+            Log.e(TAG, "Invalid organization ID");
+            callback.onError(new Exception("Invalid organization ID"));
+            return;
+        }
+
+        try {
+            databaseRef.child("users").child(organizationId).get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        DataSnapshot dataSnapshot = task.getResult();
+                        if (dataSnapshot != null && dataSnapshot.exists()) {
+                            try {
+                                User user = dataSnapshot.getValue(User.class);
+                                if (user != null && user.getUserType() == UserType.ORGANIZATION) {
+                                    Organization organization = new Organization();
+                                    organization.setId(organizationId);
+                                    organization.setName(user.getOrganizationName());
+                                    organization.setDescription(user.getOrganizationDescription());
+                                    organization.setEmail(user.getEmail());
+                                    organization.setWebsite(user.getOrganizationWebsite());
+                                    organization.setPhone(user.getPhoneNumber());
+                                    organization.setAddress(user.getLocation());
+                                    Log.d(TAG, "Organization data retrieved successfully");
+                                    callback.onSuccess(organization);
+                                } else {
+                                    Log.e(TAG, "User is not an organization");
+                                    callback.onError(new Exception("User is not an organization"));
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing organization data: " + e.getMessage());
+                                callback.onError(e);
+                            }
+                        } else {
+                            Log.e(TAG, "Organization not found");
+                            callback.onError(new Exception("Organization not found"));
+                        }
+                    } else {
+                        Log.e(TAG, "Error getting organization: " + task.getException().getMessage());
+                        callback.onError(task.getException());
+                    }
+                });
+        } catch (Exception e) {
+            Log.e(TAG, "Error in getOrganization: " + e.getMessage());
+            callback.onError(e);
+        }
     }
 
     @Override

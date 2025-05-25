@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/change_photo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:text="Change Photo"
+        android:textSize="16sp"
+        android:background="?attr/selectableItemBackground"
+        android:drawableStart="@drawable/ic_camera"
+        android:drawablePadding="16dp"
+        android:gravity="center_vertical"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/gray"/>
+
+    <TextView
+        android:id="@+id/remove_photo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:text="Remove Photo"
+        android:textSize="16sp"
+        android:textColor="@color/status_rejected"
+        android:background="?attr/selectableItemBackground"
+        android:drawableStart="@drawable/ic_delete"
+        android:drawablePadding="16dp"
+        android:gravity="center_vertical"/>
+
+</LinearLayout> 

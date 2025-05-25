@@ -1,15 +1,20 @@
 package com.example.vohoportunitysconect.ui.opportunities;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.ContextCompat;
 
 import com.example.vohoportunitysconect.MainActivity;
 import com.example.vohoportunitysconect.R;
@@ -25,12 +30,55 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class OpportunityDetailsFragment extends Fragment {
     private FragmentOpportunityDetailsBinding binding;
     private DatabaseReference databaseRef;
     private FirebaseAuth mAuth;
     private String opportunityId;
+    private static final int EMAIL_REQUEST_CODE = 1;
+    private String currentUserId;
+    private String currentOpportunityId;
+    private Opportunity currentOpportunity;
+
+    private final ActivityResultLauncher<Intent> emailLauncher = registerForActivityResult(
+        new ActivityResultContracts.StartActivityForResult(),
+        result -> {
+            if (result.getResultCode() == android.app.Activity.RESULT_OK) {
+                if (currentUserId != null && currentOpportunityId != null) {
+                    // Create application data
+                    String applicationId = UUID.randomUUID().toString();
+                    Map<String, Object> application = new HashMap<>();
+                    application.put("id", applicationId);
+                    application.put("userId", currentUserId);
+                    application.put("opportunityId", currentOpportunityId);
+                    application.put("title", currentOpportunity.getTitle());
+                    application.put("organization", currentOpportunity.getOrganization());
+                    application.put("status", "PENDING");
+                    application.put("appliedAt", System.currentTimeMillis());
+                    application.put("organizerId", currentOpportunity.getOrganizationId());
+
+                    // Save application
+                    databaseRef.child("applications").child(applicationId)
+                        .setValue(application)
+                        .addOnSuccessListener(aVoid -> {
+                            // Update UI
+                            if (binding != null) {
+                                binding.applyButton.setText(R.string.applied);
+                                binding.applyButton.setEnabled(false);
+                                binding.applyButton.setBackgroundColor(getResources().getColor(R.color.gray, null));
+                                Toast.makeText(getContext(), "Application submitted!", Toast.LENGTH_SHORT).show();
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(getContext(), "Failed to save application: " + e.getMessage(), 
+                                Toast.LENGTH_SHORT).show();
+                        });
+                }
+            }
+        }
+    );
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -92,6 +140,9 @@ public class OpportunityDetailsFragment extends Fragment {
             Toast.makeText(getContext(), "Error: Opportunity ID not found", Toast.LENGTH_SHORT).show();
             Navigation.findNavController(requireView()).popBackStack();
         }
+
+        binding.applyButton.setOnClickListener(v -> handleApplyClick());
+        checkApplicationStatus();
     }
 
     private void loadOpportunityDetails() {
@@ -123,179 +174,206 @@ public class OpportunityDetailsFragment extends Fragment {
     }
 
     private void updateUI(Opportunity opportunity) {
-        binding.opportunityTitle.setText(opportunity.getTitle());
-        binding.opportunityOrganization.setText(opportunity.getOrganization());
+        if (binding == null) return;
         
-        // Location
-        binding.locationTitle.setVisibility(opportunity.getLocation() != null && !opportunity.getLocation().isEmpty() ? View.VISIBLE : View.GONE);
-        binding.opportunityLocation.setText(opportunity.getLocation());
+        currentOpportunity = opportunity;
         
-        // Description
-        binding.descriptionTitle.setVisibility(opportunity.getDescription() != null && !opportunity.getDescription().isEmpty() ? View.VISIBLE : View.GONE);
-        binding.opportunityDescription.setText(opportunity.getDescription());
-        
-        // Requirements
-        binding.requirementsTitle.setVisibility(opportunity.getRequirements() != null && !opportunity.getRequirements().isEmpty() ? View.VISIBLE : View.GONE);
-        binding.opportunityRequirements.setText(opportunity.getRequirements());
-        
-        // Benefits
-        binding.benefitsTitle.setVisibility(opportunity.getBenefits() != null && !opportunity.getBenefits().isEmpty() ? View.VISIBLE : View.GONE);
-        binding.opportunityBenefits.setText(opportunity.getBenefits());
-        
-        // Deadline
-        binding.deadlineTitle.setVisibility(opportunity.getDeadline() != null ? View.VISIBLE : View.GONE);
-        binding.opportunityDeadline.setText(opportunity.getDeadline() != null ? 
-            new java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
-                .format(opportunity.getDeadline()) : "");
-        
-        // Update indicators
-        binding.urgentIndicator.setVisibility(opportunity.isUrgent() ? View.VISIBLE : View.GONE);
-        binding.remoteChip.setVisibility(opportunity.isRemote() ? View.VISIBLE : View.GONE);
-        binding.featuredChip.setVisibility(opportunity.isFeatured() ? View.VISIBLE : View.GONE);
-        
-        // Set up apply button
-        if (mAuth.getCurrentUser() != null) {
-            String userId = mAuth.getCurrentUser().getUid();
-            // Check if already applied
-            databaseRef.child("applications").child(userId).child(opportunityId)
-                .get().addOnSuccessListener(snapshot -> {
-                    if (snapshot.exists()) {
-                        binding.applyButton.setText(R.string.applied);
-                        binding.applyButton.setEnabled(false);
-                    } else {
-                        binding.applyButton.setText(R.string.apply_now);
-                        binding.applyButton.setEnabled(true);
-                    }
-                });
-        }
-
-        binding.applyButton.setOnClickListener(v -> {
-            if (mAuth.getCurrentUser() != null) {
-                String userId = mAuth.getCurrentUser().getUid();
-                
-                // Create application data
-                Map<String, Object> applicationData = new HashMap<>();
-                applicationData.put("opportunityId", opportunity.getId());
-                applicationData.put("opportunityTitle", opportunity.getTitle());
-                applicationData.put("organization", opportunity.getOrganization());
-                applicationData.put("status", "pending");
-                applicationData.put("appliedAt", System.currentTimeMillis());
-                applicationData.put("userId", userId);
-                
-                // Add to applications node
-                databaseRef.child("applications")
-                    .child(userId)
-                    .child(opportunityId)
-                    .setValue(applicationData)
-                    .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(getContext(), "Application submitted successfully", 
-                            Toast.LENGTH_SHORT).show();
-                        binding.applyButton.setText(R.string.applied);
-                        binding.applyButton.setEnabled(false);
-
-                        // Get organizer's email and send notification
-                        databaseRef.child("users").child(opportunity.getOrganizationId())
-                            .child("email")
-                            .get()
-                            .addOnSuccessListener(snapshot -> {
-                                String organizerEmail = snapshot.getValue(String.class);
-                                if (organizerEmail != null && !organizerEmail.isEmpty()) {
-                                    String subject = "New Application: " + opportunity.getTitle();
-                                    String body = String.format(
-                                        "Hello,\n\n" +
-                                        "A new application has been submitted for your opportunity:\n\n" +
-                                        "Opportunity: %s\n" +
-                                        "Applicant: %s\n\n" +
-                                        "Please review the application in your dashboard.\n\n" +
-                                        "Best regards,\n" +
-                                        "VOH Opportunities Connect",
-                                        opportunity.getTitle(),
-                                        mAuth.getCurrentUser().getEmail()
-                                    );
-                                    
-                                    EmailUtils.sendEmail(requireContext(), organizerEmail, subject, body);
-                                }
-                            });
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(getContext(), "Error submitting application: " + e.getMessage(), 
-                            Toast.LENGTH_SHORT).show();
-                    });
+        // Batch UI updates
+        binding.opportunityTitle.post(() -> {
+            binding.opportunityTitle.setText(opportunity.getTitle());
+            binding.opportunityOrganization.setText(opportunity.getOrganization());
+            
+            // Update visibility and text in a single pass
+            updateSectionVisibility(binding.locationTitle, binding.opportunityLocation, opportunity.getLocation());
+            updateSectionVisibility(binding.descriptionTitle, binding.opportunityDescription, opportunity.getDescription());
+            updateSectionVisibility(binding.requirementsTitle, binding.opportunityRequirements, opportunity.getRequirements());
+            updateSectionVisibility(binding.benefitsTitle, binding.opportunityBenefits, opportunity.getBenefits());
+            
+            // Update deadline
+            if (opportunity.getDeadline() != null) {
+                binding.deadlineTitle.setVisibility(View.VISIBLE);
+                binding.opportunityDeadline.setText(new java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                    .format(opportunity.getDeadline()));
             } else {
-                Toast.makeText(getContext(), "Please sign in to apply", Toast.LENGTH_SHORT).show();
+                binding.deadlineTitle.setVisibility(View.GONE);
+                binding.opportunityDeadline.setText("");
             }
+            
+            // Update indicators
+            binding.urgentIndicator.setVisibility(opportunity.isUrgent() ? View.VISIBLE : View.GONE);
+            binding.remoteChip.setVisibility(opportunity.isRemote() ? View.VISIBLE : View.GONE);
+            binding.featuredChip.setVisibility(opportunity.isFeatured() ? View.VISIBLE : View.GONE);
         });
 
-        // Check if opportunity is saved
-        if (mAuth.getCurrentUser() != null) {
-            String userId = mAuth.getCurrentUser().getUid();
-            databaseRef.child("users").child(userId).child("saved_opportunities")
-                .child(opportunityId).get().addOnSuccessListener(snapshot -> {
-                    boolean isSaved = snapshot.exists();
-                    binding.saveFab.setImageResource(isSaved ? R.drawable.ic_bookmark_filled : R.drawable.ic_bookmark_border);
-                    if (isSaved) {
-                        binding.saveFab.setColorFilter(getResources().getColor(R.color.orange, null));
-                    } else {
-                        binding.saveFab.clearColorFilter();
-                    }
-                });
+        // Setup apply button and saved state
+        setupApplyButton(opportunity);
+        setupSavedState(opportunity);
+    }
+
+    private void updateSectionVisibility(View titleView, TextView contentView, String content) {
+        if (content != null && !content.isEmpty()) {
+            titleView.setVisibility(View.VISIBLE);
+            contentView.setText(content);
+        } else {
+            titleView.setVisibility(View.GONE);
+            contentView.setText("");
+        }
+    }
+
+    private void setupApplyButton(Opportunity opportunity) {
+        if (mAuth.getCurrentUser() == null) {
+            updateApplyButtonState(false);
+            return;
         }
 
-        // Set up save button
-        binding.saveFab.setOnClickListener(v -> {
-            if (mAuth.getCurrentUser() != null) {
-                String userId = mAuth.getCurrentUser().getUid();
-                DatabaseReference savedRef = databaseRef.child("users").child(userId).child("saved_opportunities");
-                
-                savedRef.child(opportunityId).get().addOnSuccessListener(snapshot -> {
-                    if (snapshot.exists()) {
-                        // Remove from saved
-                        savedRef.child(opportunityId).removeValue()
-                            .addOnSuccessListener(aVoid -> {
-                                binding.saveFab.setImageResource(R.drawable.ic_bookmark_border);
-                                binding.saveFab.clearColorFilter();
-                                Toast.makeText(getContext(), "Removed from saved", Toast.LENGTH_SHORT).show();
-                            })
-                            .addOnFailureListener(e -> {
-                                Toast.makeText(getContext(), "Error removing from saved: " + e.getMessage(), 
-                                    Toast.LENGTH_SHORT).show();
-                            });
-                    } else {
-                        // Add to saved
-                        Map<String, Object> savedData = new HashMap<>();
-                        savedData.put("id", opportunity.getId());
-                        savedData.put("title", opportunity.getTitle());
-                        savedData.put("organization", opportunity.getOrganization());
-                        savedData.put("location", opportunity.getLocation());
-                        savedData.put("category", opportunity.getCategory());
-                        savedData.put("description", opportunity.getDescription());
-                        savedData.put("requirements", opportunity.getRequirements());
-                        savedData.put("benefits", opportunity.getBenefits());
-                        savedData.put("deadline", opportunity.getDeadline());
-                        savedData.put("savedAt", System.currentTimeMillis());
-
-                        savedRef.child(opportunityId).setValue(savedData)
-                            .addOnSuccessListener(aVoid -> {
-                                binding.saveFab.setImageResource(R.drawable.ic_bookmark_filled);
-                                binding.saveFab.setColorFilter(getResources().getColor(R.color.orange, null));
-                                Toast.makeText(getContext(), "Saved opportunity", Toast.LENGTH_SHORT).show();
-                            })
-                            .addOnFailureListener(e -> {
-                                Toast.makeText(getContext(), "Error saving opportunity: " + e.getMessage(), 
-                                    Toast.LENGTH_SHORT).show();
-                            });
+        String userId = mAuth.getCurrentUser().getUid();
+        databaseRef.child("applications")
+            .orderByChild("userId")
+            .equalTo(userId)
+            .addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    boolean isApplied = false;
+                    for (DataSnapshot applicationSnapshot : snapshot.getChildren()) {
+                        String appOpportunityId = applicationSnapshot.child("opportunityId").getValue(String.class);
+                        if (opportunity.getId().equals(appOpportunityId)) {
+                            isApplied = true;
+                            break;
+                        }
                     }
-                });
-            } else {
-                Toast.makeText(getContext(), "Please sign in to save opportunities", 
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
+                    updateApplyButtonState(isApplied);
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(getContext(), "Error checking application status", Toast.LENGTH_SHORT).show();
+                }
+            });
+    }
+
+    private void setupSavedState(Opportunity opportunity) {
+        if (mAuth.getCurrentUser() == null) {
+            binding.saveFab.setImageResource(R.drawable.ic_bookmark_border);
+            binding.saveFab.clearColorFilter();
+            return;
+        }
+
+        String userId = mAuth.getCurrentUser().getUid();
+        databaseRef.child("users").child(userId).child("saved_opportunities")
+            .child(opportunity.getId())
+            .get()
+            .addOnSuccessListener(snapshot -> {
+                boolean isSaved = snapshot.exists();
+                binding.saveFab.setImageResource(isSaved ? R.drawable.ic_bookmark_filled : R.drawable.ic_bookmark_border);
+                if (isSaved) {
+                    binding.saveFab.setColorFilter(getResources().getColor(R.color.orange, null));
+                } else {
+                    binding.saveFab.clearColorFilter();
+                }
+            });
+    }
+
+    private void updateApplyButtonState(boolean isApplied) {
+        if (binding != null) {
+            binding.applyButton.setEnabled(!isApplied);
+            binding.applyButton.setText(isApplied ? "Applied" : "Apply");
+            binding.applyButton.setBackgroundTintList(ContextCompat.getColorStateList(
+                requireContext(),
+                isApplied ? R.color.gray : R.color.green
+            ));
+        }
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        // Clear references to prevent memory leaks
+        if (binding != null) {
+            binding.applyButton.setOnClickListener(null);
+            binding.saveFab.setOnClickListener(null);
+            binding.backButton.setOnClickListener(null);
+        }
         binding = null;
+    }
+
+    private void checkApplicationStatus() {
+        if (mAuth.getCurrentUser() != null) {
+            String userId = mAuth.getCurrentUser().getUid();
+            String opportunityId = getArguments().getString("opportunityId");
+
+            databaseRef.child("applications")
+                .orderByChild("userId")
+                .equalTo(userId)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        boolean isApplied = false;
+                        for (DataSnapshot applicationSnapshot : snapshot.getChildren()) {
+                            String appOpportunityId = applicationSnapshot.child("opportunityId").getValue(String.class);
+                            if (opportunityId != null && opportunityId.equals(appOpportunityId)) {
+                                isApplied = true;
+                                break;
+                            }
+                        }
+                        updateApplyButtonState(isApplied);
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Toast.makeText(getContext(), "Error checking application status", Toast.LENGTH_SHORT).show();
+                    }
+                });
+        }
+    }
+
+    private void handleApplyClick() {
+        if (mAuth.getCurrentUser() != null && currentOpportunity != null) {
+            String userId = mAuth.getCurrentUser().getUid();
+            
+            // First update the button state
+            updateApplyButtonState(true);
+            
+            // Get organizer's email
+            databaseRef.child("users").child(currentOpportunity.getOrganizationId())
+                .child("email")
+                .get()
+                .addOnSuccessListener(emailSnapshot -> {
+                    String organizerEmail = emailSnapshot.getValue(String.class);
+                    if (organizerEmail != null && !organizerEmail.isEmpty()) {
+                        String subject = "Application for: " + currentOpportunity.getTitle();
+                        String body = "Hello,\n\nI am interested in applying for the opportunity '" + 
+                            currentOpportunity.getTitle() + "' at " + currentOpportunity.getOrganization() + 
+                            ".\n\nPlease let me know about the next steps.\n\nThank you!";
+                        
+                        Intent emailIntent = new Intent(Intent.ACTION_SEND);
+                        emailIntent.setType("message/rfc822");
+                        emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{organizerEmail});
+                        emailIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
+                        emailIntent.putExtra(Intent.EXTRA_TEXT, body);
+                        
+                        try {
+                            currentUserId = userId;
+                            currentOpportunityId = currentOpportunity.getId();
+                            emailLauncher.launch(Intent.createChooser(emailIntent, "Send email..."));
+                        } catch (android.content.ActivityNotFoundException ex) {
+                            Toast.makeText(getContext(), "No email clients installed.", Toast.LENGTH_SHORT).show();
+                            // Revert button state if email client is not available
+                            updateApplyButtonState(false);
+                        }
+                    } else {
+                        Toast.makeText(getContext(), "Organizer email not available.", Toast.LENGTH_SHORT).show();
+                        // Revert button state if email is not available
+                        updateApplyButtonState(false);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), "Error getting organizer email: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                    // Revert button state if there's an error
+                    updateApplyButtonState(false);
+                });
+        } else {
+            Toast.makeText(getContext(), "Please sign in to apply", Toast.LENGTH_SHORT).show();
+        }
     }
 } 

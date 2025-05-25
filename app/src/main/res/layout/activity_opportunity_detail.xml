@@ -1,67 +1,135 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
+        <!-- Title -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/opportunity_title"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
-            app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light" />
+            android:layout_height="wrap_content"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="8dp"/>
 
-    </com.google.android.material.appbar.AppBarLayout>
+        <!-- Organization -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/organization_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="18sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="16dp"/>
 
-    <androidx.core.widget.NestedScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        <!-- Chips Container -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginBottom="16dp">
 
+            <com.google.android.material.chip.ChipGroup
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:singleLine="true">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/location_chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    app:chipBackgroundColor="@color/chip_background"
+                    app:chipIcon="@drawable/ic_location"
+                    app:chipIconTint="@color/primary"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/difficulty_chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    app:chipBackgroundColor="@color/chip_background"
+                    app:chipIcon="@drawable/ic_difficulty"
+                    app:chipIconTint="@color/primary"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/deadline_chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    app:chipBackgroundColor="@color/chip_background"
+                    app:chipIcon="@drawable/ic_calendar"
+                    app:chipIconTint="@color/primary"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/category_chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    app:chipBackgroundColor="@color/chip_background"
+                    app:chipIcon="@drawable/ic_category"
+                    app:chipIconTint="@color/primary"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/skills_chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:chipBackgroundColor="@color/chip_background"
+                    app:chipIcon="@drawable/ic_skills"
+                    app:chipIconTint="@color/primary"/>
+
+            </com.google.android.material.chip.ChipGroup>
+        </HorizontalScrollView>
+
+        <!-- Description -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/opportunity_description"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Rating Section -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/opportunity_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textAppearance="@style/TextAppearance.MaterialComponents.Headline5"
-                tools:text="Volunteer Opportunity Title" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/organization_name"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
-                tools:text="Organization Name" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/opportunity_description"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:textAppearance="@style/TextAppearance.MaterialComponents.Body1"
-                tools:text="This is a detailed description of the volunteer opportunity. It explains what volunteers will be doing, what impact they will make, and any requirements or expectations." />
+            android:orientation="horizontal"
+            android:layout_marginBottom="24dp">
 
             <TextView
-                android:id="@+id/description_text"
-                android:layout_width="match_parent"
+                android:id="@+id/rating_text"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textAppearance="@style/TextAppearance.MaterialComponents.Body1" />
+                android:layout_weight="1"
+                android:textSize="16sp"
+                android:textColor="@color/text_primary"/>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/rate_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Rate"
+                app:backgroundTint="@color/primary"/>
         </LinearLayout>
 
-    </androidx.core.widget.NestedScrollView>
+        <!-- Apply Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/apply_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Apply Now"
+            android:textSize="16sp"
+            app:backgroundTint="@color/primary"/>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout> 
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView> 

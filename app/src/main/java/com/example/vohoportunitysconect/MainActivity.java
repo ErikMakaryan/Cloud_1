@@ -2,6 +2,7 @@ package com.example.vohoportunitysconect;
 
 import static android.content.Context.MODE_PRIVATE;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -200,6 +201,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         int itemId = item.getItemId();
         
         if (itemId == R.id.nav_logout) {
+            drawerLayout.closeDrawer(GravityCompat.START);
             handleLogout();
             return true;
         }
@@ -213,9 +215,27 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void handleLogout() {
         try {
+            // Sign out from Firebase
             mAuth.signOut();
+            
+            // Clear any stored credentials or preferences
             clearUserSession();
-            redirectToLogin();
+            
+            // Clear any cached data
+            if (getApplicationContext() != null) {
+                getApplicationContext().getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .clear()
+                    .apply();
+            }
+            
+            Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show();
+            
+            // Redirect to login screen
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
         } catch (Exception e) {
             Log.e(TAG, "Error during logout: " + e.getMessage(), e);
             Toast.makeText(this, "Error logging out: " + e.getMessage(), Toast.LENGTH_SHORT).show();

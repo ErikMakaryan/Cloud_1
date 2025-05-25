@@ -5,34 +5,28 @@ import java.util.Date;
 
 public class Application {
     private String id;
+    private String userId;
     private String opportunityId;
-    private String opportunityTitle;
-    private String organizationName;
-    private String volunteerId;
-    private String volunteerName;
-    private String volunteerEmail;
-    private String organizerId;
-    private String message;
+    private String title;
+    private String organization;
     private String status;
-    private Date appliedDate;
+    private long appliedAt;
+    private String organizerId;
 
     public Application() {
         // Required empty constructor for Firebase
     }
 
-    public Application(String opportunityId, String opportunityTitle, String organizationName,
-                      String volunteerId, String volunteerName, String volunteerEmail,
-                      String organizerId, String message) {
+    public Application(String id, String userId, String opportunityId, String title, 
+                      String organization, String status, long appliedAt, String organizerId) {
+        this.id = id;
+        this.userId = userId;
         this.opportunityId = opportunityId;
-        this.opportunityTitle = opportunityTitle;
-        this.organizationName = organizationName;
-        this.volunteerId = volunteerId;
-        this.volunteerName = volunteerName;
-        this.volunteerEmail = volunteerEmail;
+        this.title = title;
+        this.organization = organization;
+        this.status = status;
+        this.appliedAt = appliedAt;
         this.organizerId = organizerId;
-        this.message = message;
-        this.status = "pending";
-        this.appliedDate = new Date();
     }
 
     public String getId() {
@@ -43,6 +37,14 @@ public class Application {
         this.id = id;
     }
 
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
     public String getOpportunityId() {
         return opportunityId;
     }
@@ -51,60 +53,20 @@ public class Application {
         this.opportunityId = opportunityId;
     }
 
-    public String getOpportunityTitle() {
-        return opportunityTitle;
+    public String getTitle() {
+        return title;
     }
 
-    public void setOpportunityTitle(String opportunityTitle) {
-        this.opportunityTitle = opportunityTitle;
+    public void setTitle(String title) {
+        this.title = title;
     }
 
-    public String getOrganizationName() {
-        return organizationName;
+    public String getOrganization() {
+        return organization;
     }
 
-    public void setOrganizationName(String organizationName) {
-        this.organizationName = organizationName;
-    }
-
-    public String getVolunteerId() {
-        return volunteerId;
-    }
-
-    public void setVolunteerId(String volunteerId) {
-        this.volunteerId = volunteerId;
-    }
-
-    public String getVolunteerName() {
-        return volunteerName;
-    }
-
-    public void setVolunteerName(String volunteerName) {
-        this.volunteerName = volunteerName;
-    }
-
-    public String getVolunteerEmail() {
-        return volunteerEmail;
-    }
-
-    public void setVolunteerEmail(String volunteerEmail) {
-        this.volunteerEmail = volunteerEmail;
-    }
-
-    public String getOrganizerId() {
-        return organizerId;
-    }
-
-    public void setOrganizerId(String organizerId) {
-        this.organizerId = organizerId;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
+    public void setOrganization(String organization) {
+        this.organization = organization;
     }
 
     public String getStatus() {
@@ -115,12 +77,20 @@ public class Application {
         this.status = status;
     }
 
-    public Date getAppliedDate() {
-        return appliedDate;
+    public long getAppliedAt() {
+        return appliedAt;
     }
 
-    public void setAppliedDate(Date appliedDate) {
-        this.appliedDate = appliedDate;
+    public void setAppliedAt(long appliedAt) {
+        this.appliedAt = appliedAt;
+    }
+
+    public String getOrganizerId() {
+        return organizerId;
+    }
+
+    public void setOrganizerId(String organizerId) {
+        this.organizerId = organizerId;
     }
 
     @Exclude

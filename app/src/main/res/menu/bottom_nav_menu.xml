@@ -11,11 +11,6 @@
         android:title="Saved" />
 
     <item
-        android:id="@+id/myApplicationsFragment"
-        android:icon="@drawable/ic_applications"
-        android:title="Applications" />
-
-    <item
         android:id="@+id/nav_profile"
         android:icon="@drawable/ic_profile"
         android:title="Profile" />

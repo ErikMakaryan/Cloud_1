@@ -172,6 +172,23 @@ public class FirebaseManager {
             });
     }
 
+    public void createUser(String email, String password, OnCompleteListener<AuthResult> listener) {
+        checkInitialization();
+        if (!checkGooglePlayServices()) {
+            listener.onComplete(null);
+            return;
+        }
+
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult().getUser() != null) {
+                    String userId = task.getResult().getUser().getUid();
+                    Log.d(TAG, "User created successfully with ID: " + userId);
+                }
+                listener.onComplete(task);
+            });
+    }
+
     public void signOut() {
         checkInitialization();
         auth.signOut();
@@ -180,6 +197,11 @@ public class FirebaseManager {
     public FirebaseUser getCurrentUser() {
         checkInitialization();
         return auth.getCurrentUser();
+    }
+
+    public FirebaseDatabase getDatabase() {
+        checkInitialization();
+        return database;
     }
 
     // Realtime Database Methods

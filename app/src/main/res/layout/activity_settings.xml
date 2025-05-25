@@ -6,206 +6,156 @@
     android:background="@color/background"
     android:fillViewport="true">
 
-    <LinearLayout
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@color/background">
+        android:layout_height="match_parent">
 
-        <!-- Return Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/return_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Return"
-            android:layout_marginBottom="16dp"
-            app:icon="@drawable/ic_arrow_back"
-            app:iconGravity="start"
-            app:iconPadding="8dp"
-            app:backgroundTint="@color/primary"/>
-
-        <!-- Account Settings Card -->
-        <com.google.android.material.card.MaterialCardView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/card_background">
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:background="@color/background">
 
-            <LinearLayout
+            <!-- Return Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/return_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Return"
+                android:layout_marginBottom="16dp"
+                app:icon="@drawable/ic_arrow_back"
+                app:iconGravity="start"
+                app:iconPadding="8dp"
+                app:backgroundTint="@color/primary"/>
+
+            <!-- Account Settings Card -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/card_background">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Account Settings"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/primary"
-                    android:layout_marginBottom="16dp"/>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/change_password_button"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Change Password"
-                    android:layout_marginBottom="8dp"
-                    app:icon="@drawable/ic_lock"
-                    app:iconGravity="start"
-                    app:iconPadding="8dp"
-                    app:backgroundTint="@color/primary"/>
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/delete_account_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Delete Account"
-                    app:icon="@drawable/ic_delete"
-                    app:iconGravity="start"
-                    app:iconPadding="8dp"
-                    app:backgroundTint="@color/primary"
-                    android:textColor="@color/white"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Account Settings"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary"
+                        android:layout_marginBottom="16dp"/>
 
-            </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/change_password_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Change Password"
+                        android:layout_marginBottom="8dp"
+                        app:icon="@drawable/ic_lock"
+                        app:iconGravity="start"
+                        app:iconPadding="8dp"
+                        app:backgroundTint="@color/primary"/>
 
-        </com.google.android.material.card.MaterialCardView>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/delete_account_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Delete Account"
+                        app:icon="@drawable/ic_delete"
+                        app:iconGravity="start"
+                        app:iconPadding="8dp"
+                        app:backgroundTint="@color/primary"
+                        android:textColor="@color/white"/>
 
-        <!-- Add Opportunity Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/card_background">
+                </LinearLayout>
 
-            <LinearLayout
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Add Opportunity Card -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/card_background">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Opportunity Management"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/primary"
-                    android:layout_marginBottom="16dp"/>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/add_opportunity_button"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Add New Opportunity"
-                    app:icon="@drawable/ic_add"
-                    app:iconGravity="start"
-                    app:iconPadding="8dp"
-                    app:backgroundTint="@color/primary"/>
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-            </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Opportunity Management"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary"
+                        android:layout_marginBottom="16dp"/>
 
-        </com.google.android.material.card.MaterialCardView>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/add_opportunity_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Add New Opportunity"
+                        app:icon="@drawable/ic_add"
+                        app:iconGravity="start"
+                        app:iconPadding="8dp"
+                        app:backgroundTint="@color/primary"/>
 
-        <!-- Notifications Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/card_background">
+                </LinearLayout>
 
-            <LinearLayout
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- App Settings Card -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/card_background">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Notifications"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/primary"
-                    android:layout_marginBottom="16dp"/>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/notifications_switch"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Push Notifications"
-                    android:textColor="@color/text_primary"
-                    android:layout_marginBottom="8dp"
-                    app:thumbTint="@color/primary"
-                    app:trackTint="@color/primary"/>
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/email_notifications_switch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Email Notifications"
-                    android:textColor="@color/text_primary"
-                    app:thumbTint="@color/primary"
-                    app:trackTint="@color/primary"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="App Settings"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary"
+                        android:layout_marginBottom="16dp"/>
 
-            </LinearLayout>
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/dark_mode_switch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Dark Mode"
+                        android:textColor="@color/text_primary"
+                        app:thumbTint="@color/primary"
+                        app:trackTint="@color/primary"/>
 
-        </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
 
-        <!-- App Settings Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/card_background">
+            </com.google.android.material.card.MaterialCardView>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+        </LinearLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="App Settings"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/primary"
-                    android:layout_marginBottom="16dp"/>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/dark_mode_switch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Dark Mode"
-                    android:textColor="@color/text_primary"
-                    android:layout_marginBottom="8dp"
-                    app:thumbTint="@color/primary"
-                    app:trackTint="@color/primary"/>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/location_services_switch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Location Services"
-                    android:textColor="@color/text_primary"
-                    app:thumbTint="@color/primary"
-                    app:trackTint="@color/primary"/>
-
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-    </LinearLayout>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </androidx.core.widget.NestedScrollView> 

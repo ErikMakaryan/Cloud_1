@@ -79,6 +79,7 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
         private final TextView organizationText;
         private final TextView locationText;
         private final TextView categoryText;
+        private final TextView applicationStatusText;
         private final ImageButton saveButton;
 
         OpportunityViewHolder(@NonNull View itemView) {
@@ -87,6 +88,7 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
             organizationText = itemView.findViewById(R.id.opportunity_organization);
             locationText = itemView.findViewById(R.id.opportunity_location);
             categoryText = itemView.findViewById(R.id.opportunity_category);
+            applicationStatusText = itemView.findViewById(R.id.application_status);
             saveButton = itemView.findViewById(R.id.save_button);
 
             itemView.setOnClickListener(v -> {
@@ -113,6 +115,31 @@ public class OpportunityAdapter extends RecyclerView.Adapter<OpportunityAdapter.
             organizationText.setText(opportunity.getOrganization() != null ? opportunity.getOrganization() : "");
             locationText.setText(opportunity.getLocation() != null ? opportunity.getLocation() : "");
             categoryText.setText(opportunity.getCategory() != null ? opportunity.getCategory() : "");
+
+            // Set application status
+            String status = opportunity.getApplicationStatus();
+            if (status != null && !status.isEmpty()) {
+                applicationStatusText.setVisibility(View.VISIBLE);
+                applicationStatusText.setText(status.toUpperCase());
+                // Set color based on status
+                int colorRes;
+                switch (status.toLowerCase()) {
+                    case "pending":
+                        colorRes = R.color.orange;
+                        break;
+                    case "accepted":
+                        colorRes = R.color.green;
+                        break;
+                    case "rejected":
+                        colorRes = R.color.red;
+                        break;
+                    default:
+                        colorRes = R.color.primary;
+                }
+                applicationStatusText.setTextColor(itemView.getContext().getResources().getColor(colorRes, null));
+            } else {
+                applicationStatusText.setVisibility(View.GONE);
+            }
 
             // Check if opportunity is saved
             savedRef.child(opportunity.getId()).get().addOnSuccessListener(snapshot -> {

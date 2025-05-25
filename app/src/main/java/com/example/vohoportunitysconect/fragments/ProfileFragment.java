@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -18,6 +19,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
+import com.bumptech.glide.Glide;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.activities.LoginActivity;
 import com.example.vohoportunitysconect.activities.SettingsActivity;
@@ -34,7 +36,7 @@ import java.util.Map;
 
 public class ProfileFragment extends Fragment {
     private View rootView;
-    private TextView nameText, emailText, hoursText, applicationsCount;
+    private TextView nameText, emailText, hoursText;
     private MaterialButton settingsButton, signOutButton, addHoursButton, deleteHoursButton;
     private FirebaseAuth mAuth;
     private DatabaseReference databaseRef;
@@ -117,16 +119,16 @@ public class ProfileFragment extends Fragment {
             nameText = rootView.findViewById(R.id.name_text);
             emailText = rootView.findViewById(R.id.email_text);
             hoursText = rootView.findViewById(R.id.hours_text);
-            applicationsCount = rootView.findViewById(R.id.applications_count);
             settingsButton = rootView.findViewById(R.id.settings_button);
             signOutButton = rootView.findViewById(R.id.sign_out_button);
             addHoursButton = rootView.findViewById(R.id.add_hours_button);
             deleteHoursButton = rootView.findViewById(R.id.delete_hours_button);
+            ImageView profileImage = rootView.findViewById(R.id.profile_image);
 
             // Verify all required views are initialized
             if (nameText == null || emailText == null || 
-                hoursText == null || applicationsCount == null || settingsButton == null || 
-                signOutButton == null || addHoursButton == null || deleteHoursButton == null) {
+                hoursText == null || settingsButton == null || 
+                signOutButton == null || addHoursButton == null || deleteHoursButton == null || profileImage == null) {
                 throw new IllegalStateException("Failed to initialize all required views");
             }
 
@@ -134,7 +136,7 @@ public class ProfileFragment extends Fragment {
             nameText.setText("");
             emailText.setText("");
             hoursText.setText("0");
-            applicationsCount.setText("0");
+            profileImage.setImageResource(R.drawable.placeholder_profile);
         } catch (Exception e) {
             Log.e("ProfileFragment", "Error in initializeViews: " + e.getMessage());
             throw e;
@@ -257,10 +259,18 @@ public class ProfileFragment extends Fragment {
                             Long hours = dataSnapshot.child("volunteerHours").getValue(Long.class);
                             hoursText.setText(hours != null ? String.valueOf(hours) : "0");
                         }
-                        
-                        // Load pending applications count
-                        if (isAdded() && isViewInitialized && rootView != null) {
-                            loadApplicationsCount(userId);
+
+                        // Update profile image
+                        ImageView profileImage = rootView.findViewById(R.id.profile_image);
+                        String profileImageUrl = dataSnapshot.child("profileImageUrl").getValue(String.class);
+                        if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
+                            Glide.with(requireContext())
+                                .load(profileImageUrl)
+                                .placeholder(R.drawable.placeholder_profile)
+                                .error(R.drawable.placeholder_profile)
+                                .into(profileImage);
+                        } else {
+                            profileImage.setImageResource(R.drawable.placeholder_profile);
                         }
                     }
                 } catch (Exception e) {
@@ -281,92 +291,6 @@ public class ProfileFragment extends Fragment {
                 reconnectToDatabase();
             }
         });
-    }
-
-    private void loadApplicationsCount(String userId) {
-        if (!isAdded() || !isViewInitialized || rootView == null) {
-            Log.d("ProfileFragment", "Skipping applications count load - fragment not ready");
-            return;
-        }
-
-        try {
-            // Get a fresh reference to the view
-            TextView applicationsCountView = rootView.findViewById(R.id.applications_count);
-            if (applicationsCountView == null) {
-                Log.e("ProfileFragment", "Applications count view not found");
-                return;
-            }
-
-            // Set initial value
-            applicationsCountView.setText("0");
-
-            databaseRef.child("applications")
-                .orderByChild("userId")
-                .equalTo(userId)
-                .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        if (!isAdded() || !isViewInitialized || rootView == null) {
-                            Log.d("ProfileFragment", "Skipping applications count update - fragment not ready");
-                            return;
-                        }
-
-                        try {
-                            // Get a fresh reference to the view
-                            TextView countView = rootView.findViewById(R.id.applications_count);
-                            if (countView == null) {
-                                Log.e("ProfileFragment", "Applications count view not found in callback");
-                                return;
-                            }
-
-                            int pendingCount = 0;
-                            for (DataSnapshot appSnapshot : snapshot.getChildren()) {
-                                String status = appSnapshot.child("status").getValue(String.class);
-                                if ("pending".equals(status)) {
-                                    pendingCount++;
-                                }
-                            }
-                            countView.setText(String.valueOf(pendingCount));
-                        } catch (Exception e) {
-                            Log.e("ProfileFragment", "Error updating applications count: " + e.getMessage());
-                            if (isAdded() && rootView != null) {
-                                TextView countView = rootView.findViewById(R.id.applications_count);
-                                if (countView != null) {
-                                    countView.setText("0");
-                                }
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e("ProfileFragment", "Error loading applications: " + error.getMessage());
-                        if (isAdded() && rootView != null) {
-                            try {
-                                TextView countView = rootView.findViewById(R.id.applications_count);
-                                if (countView != null) {
-                                    countView.setText("0");
-                                }
-                            } catch (Exception e) {
-                                Log.e("ProfileFragment", "Error setting applications count: " + e.getMessage());
-                            }
-                        }
-                        reconnectToDatabase();
-                    }
-                });
-        } catch (Exception e) {
-            Log.e("ProfileFragment", "Error in loadApplicationsCount: " + e.getMessage());
-            if (isAdded() && rootView != null) {
-                try {
-                    TextView countView = rootView.findViewById(R.id.applications_count);
-                    if (countView != null) {
-                        countView.setText("0");
-                    }
-                } catch (Exception ex) {
-                    Log.e("ProfileFragment", "Error setting applications count: " + ex.getMessage());
-                }
-            }
-        }
     }
 
     private void showAddHoursDialog() {
@@ -485,7 +409,6 @@ public class ProfileFragment extends Fragment {
         nameText = null;
         emailText = null;
         hoursText = null;
-        applicationsCount = null;
         settingsButton = null;
         signOutButton = null;
         addHoursButton = null;

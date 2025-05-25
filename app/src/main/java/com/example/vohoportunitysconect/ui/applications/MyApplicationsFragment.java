@@ -16,139 +16,110 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.adapters.OpportunityAdapter;
+import com.example.vohoportunitysconect.databinding.FragmentMyApplicationsBinding;
 import com.example.vohoportunitysconect.models.Opportunity;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MyApplicationsFragment extends Fragment implements OpportunityAdapter.OnOpportunityClickListener {
-    private RecyclerView applicationsRecycler;
-    private TextView emptyStateText;
-    private View progressBar;
-    private FirebaseAuth mAuth;
+    private FragmentMyApplicationsBinding binding;
+    private List<Opportunity> applications = new ArrayList<>();
+    private OpportunityAdapter adapter;
     private DatabaseReference databaseRef;
-    private OpportunityAdapter opportunityAdapter;
+    private ValueEventListener applicationsListener;
 
     @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        mAuth = FirebaseAuth.getInstance();
-        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        binding = FragmentMyApplicationsBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
-    @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_my_applications, container, false);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         
-        // Initialize views
-        applicationsRecycler = root.findViewById(R.id.applications_recycler);
-        emptyStateText = root.findViewById(R.id.empty_state_text);
-        progressBar = root.findViewById(R.id.progress_bar);
-
-        // Setup RecyclerView
         setupRecyclerView();
-
-        // Load applications
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
         loadApplications();
-
-        return root;
     }
 
     private void setupRecyclerView() {
-        applicationsRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
-        opportunityAdapter = new OpportunityAdapter(new ArrayList<>(), this);
-        applicationsRecycler.setAdapter(opportunityAdapter);
+        adapter = new OpportunityAdapter(applications, this);
+        binding.applicationsRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
+        binding.applicationsRecycler.setAdapter(adapter);
     }
 
     private void loadApplications() {
-        if (mAuth.getCurrentUser() == null) {
-            showEmptyState();
-            return;
-        }
-
-        showLoading();
+        FirebaseAuth mAuth = FirebaseAuth.getInstance();
         String userId = mAuth.getCurrentUser().getUid();
-        
-        databaseRef.child("users").child(userId).child("applications")
-            .addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    List<Opportunity> applications = new ArrayList<>();
-                    
-                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
-                        String opportunityId = snapshot.getKey();
-                        if (opportunityId != null) {
-                            databaseRef.child("opportunities").child(opportunityId)
-                                .get().addOnSuccessListener(opportunitySnapshot -> {
-                                    Opportunity opportunity = opportunitySnapshot.getValue(Opportunity.class);
-                                    if (opportunity != null) {
-                                        opportunity.setId(opportunityId);
-                                        applications.add(opportunity);
-                                        opportunityAdapter.updateOpportunities(applications);
-                                        updateUI(applications);
-                                    }
-                                });
-                        }
-                    }
-                    
-                    if (applications.isEmpty()) {
-                        showEmptyState();
-                    } else {
-                        hideLoading();
-                    }
-                }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    hideLoading();
-                    Toast.makeText(getContext(), "Error loading applications: " + databaseError.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
-                }
-            });
-    }
+        binding.progressBar.setVisibility(View.VISIBLE);
+        binding.emptyStateText.setVisibility(View.GONE);
 
-    private void updateUI(List<Opportunity> opportunities) {
-        if (opportunities.isEmpty()) {
-            showEmptyState();
-        } else {
-            hideEmptyState();
-            opportunityAdapter.updateOpportunities(opportunities);
+        // Remove existing listener if any
+        if (applicationsListener != null) {
+            databaseRef.child("applications").removeEventListener(applicationsListener);
         }
+
+        // Query applications for current user
+        Query query = databaseRef.child("applications")
+            .orderByChild("userId")
+            .equalTo(userId);
+
+        applicationsListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                applications.clear();
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    Opportunity opportunity = snapshot.getValue(Opportunity.class);
+                    if (opportunity != null) {
+                        applications.add(opportunity);
+                    }
+                }
+
+                binding.progressBar.setVisibility(View.GONE);
+                if (applications.isEmpty()) {
+                    binding.emptyStateText.setVisibility(View.VISIBLE);
+                } else {
+                    binding.emptyStateText.setVisibility(View.GONE);
+                }
+                adapter.updateOpportunities(applications);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                binding.progressBar.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Error loading applications: " + databaseError.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        };
+
+        query.addValueEventListener(applicationsListener);
     }
 
-    private void showLoading() {
-        progressBar.setVisibility(View.VISIBLE);
-        applicationsRecycler.setVisibility(View.GONE);
-        emptyStateText.setVisibility(View.GONE);
-    }
-
-    private void hideLoading() {
-        progressBar.setVisibility(View.GONE);
-        applicationsRecycler.setVisibility(View.VISIBLE);
-    }
-
-    private void showEmptyState() {
-        progressBar.setVisibility(View.GONE);
-        applicationsRecycler.setVisibility(View.GONE);
-        emptyStateText.setVisibility(View.VISIBLE);
-    }
-
-    private void hideEmptyState() {
-        emptyStateText.setVisibility(View.GONE);
-        applicationsRecycler.setVisibility(View.VISIBLE);
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (applicationsListener != null) {
+            databaseRef.child("applications").removeEventListener(applicationsListener);
+        }
+        binding = null;
     }
 
     @Override
     public void onOpportunityClick(Opportunity opportunity) {
         Bundle args = new Bundle();
         args.putString("opportunityId", opportunity.getId());
+        args.putString("previousFragment", "applications");
         Navigation.findNavController(requireView())
             .navigate(R.id.action_opportunitiesFragment_to_opportunityDetailsFragment, args);
     }

@@ -16,19 +16,9 @@
     </fragment>
 
     <fragment
-        android:id="@+id/opportunityDetailsFragment"
-        android:name="com.example.vohoportunitysconect.ui.opportunities.OpportunityDetailsFragment"
-        android:label="Opportunity Details"
-        tools:layout="@layout/fragment_opportunity_details">
-        <argument
-            android:name="opportunity_id"
-            app:argType="string" />
-    </fragment>
-
-    <fragment
         android:id="@+id/savedOpportunitiesFragment"
         android:name="com.example.vohoportunitysconect.ui.saved.SavedOpportunitiesFragment"
-        android:label="Saved Opportunities"
+        android:label="Saved"
         tools:layout="@layout/fragment_saved_opportunities">
         <action
             android:id="@+id/action_savedOpportunitiesFragment_to_opportunityDetailsFragment"
@@ -36,29 +26,17 @@
     </fragment>
 
     <fragment
-        android:id="@+id/myApplicationsFragment"
-        android:name="com.example.vohoportunitysconect.ui.applications.MyApplicationsFragment"
-        android:label="My Applications"
-        tools:layout="@layout/fragment_my_applications">
-        <action
-            android:id="@+id/action_myApplicationsFragment_to_opportunityDetailsFragment"
-            app:destination="@id/opportunityDetailsFragment" />
+        android:id="@+id/opportunityDetailsFragment"
+        android:name="com.example.vohoportunitysconect.ui.opportunities.OpportunityDetailsFragment"
+        android:label="Opportunity Details"
+        tools:layout="@layout/fragment_opportunity_details">
+        <argument
+            android:name="opportunityId"
+            app:argType="string" />
+        <argument
+            android:name="previousFragment"
+            app:argType="string" />
     </fragment>
-
-    <fragment
-        android:id="@+id/nav_home"
-        android:name="com.example.vohoportunitysconect.ui.home.HomeFragment"
-        android:label="Home" />
-
-    <fragment
-        android:id="@+id/nav_applications"
-        android:name="com.example.vohoportunitysconect.ui.applications.ApplicationsFragment"
-        android:label="My Applications" />
-
-    <fragment
-        android:id="@+id/nav_saved"
-        android:name="com.example.vohoportunitysconect.ui.saved.SavedFragment"
-        android:label="Saved" />
 
     <fragment
         android:id="@+id/nav_profile"

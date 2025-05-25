@@ -9,10 +9,10 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.viewpager2.widget.ViewPager2;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.vohoportunitysconect.R;
-import com.example.vohoportunitysconect.adapters.ApplicationsPagerAdapter;
+import com.example.vohoportunitysconect.adapters.ApplicationAdapter;
 import com.example.vohoportunitysconect.models.User;
 import com.example.vohoportunitysconect.models.UserType;
 import com.google.android.material.tabs.TabLayout;
@@ -25,9 +25,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 public class ApplicationsFragment extends Fragment {
-    private ViewPager2 viewPager;
-    private TabLayout tabLayout;
-    private ApplicationsPagerAdapter pagerAdapter;
+    private RecyclerView applicationsRecycler;
     private DatabaseReference databaseRef;
     private FirebaseAuth auth;
 
@@ -48,8 +46,7 @@ public class ApplicationsFragment extends Fragment {
     }
 
     private void initializeViews(View view) {
-        viewPager = view.findViewById(R.id.view_pager);
-        tabLayout = view.findViewById(R.id.tab_layout);
+        applicationsRecycler = view.findViewById(R.id.applications_recycler);
     }
 
     private void checkUserType() {
@@ -66,36 +63,23 @@ public class ApplicationsFragment extends Fragment {
                 User user = snapshot.getValue(User.class);
                 if (user != null) {
                     boolean isOrganizer = user.getUserType() == UserType.ORGANIZATION;
-                    setupViewPager(isOrganizer);
+                    loadApplications(isOrganizer);
                 } else {
-                    setupViewPager(false); // Default to volunteer view if user data not found
+                    loadApplications(false); // Default to volunteer view if user data not found
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 Toast.makeText(getContext(), "Error loading user data: " + error.getMessage(), Toast.LENGTH_SHORT).show();
-                setupViewPager(false); // Default to volunteer view on error
+                loadApplications(false); // Default to volunteer view on error
             }
         });
     }
 
-    private void setupViewPager(boolean isOrganizer) {
-        pagerAdapter = new ApplicationsPagerAdapter(requireActivity(), isOrganizer);
-        viewPager.setAdapter(pagerAdapter);
-
-        new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
-            switch (position) {
-                case 0:
-                    tab.setText("Pending");
-                    break;
-                case 1:
-                    tab.setText("Accepted");
-                    break;
-                case 2:
-                    tab.setText("Rejected");
-                    break;
-            }
-        }).attach();
+    private void loadApplications(boolean isOrganizer) {
+        // Implement the logic to load applications for the user and display them in the RecyclerView
+        // This is a placeholder and should be replaced with the actual implementation
+        Toast.makeText(getContext(), "Loading applications...", Toast.LENGTH_SHORT).show();
     }
 } 

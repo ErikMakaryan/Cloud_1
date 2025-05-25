@@ -31,17 +31,22 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.example.vohoportunitysconect.firebase.FirebaseManager;
+import java.util.HashMap;
+import java.util.Map;
 
 public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
     private static final String PREF_NAME = "VOHPrefs";
     private static final String KEY_USER_EMAIL = "user_email";
     private static final String KEY_USER_PASSWORD = "user_password";
+    private static final String DEMO_EMAIL = "individualproject2025@gmail.com";
+    private static final String DEMO_PASSWORD = "Samsung2025";
 
     private EditText emailInput;
     private EditText passwordInput;
     private Button loginButton;
     private Button signUpButton;
+    private Button quickLoginButton;
     private ProgressBar progressBar;
     private FirebaseManager firebaseManager;
     private SharedPreferences sharedPreferences;
@@ -114,9 +119,11 @@ public class LoginActivity extends AppCompatActivity {
             passwordInput = findViewById(R.id.password_input);
             loginButton = findViewById(R.id.login_button);
             signUpButton = findViewById(R.id.signup_button);
+            quickLoginButton = findViewById(R.id.quick_login_button);
             progressBar = findViewById(R.id.progress_bar);
 
-            if (emailInput == null || passwordInput == null || loginButton == null || signUpButton == null || progressBar == null) {
+            if (emailInput == null || passwordInput == null || loginButton == null || 
+                signUpButton == null || quickLoginButton == null || progressBar == null) {
                 throw new IllegalStateException("One or more views could not be initialized");
             }
 
@@ -173,6 +180,7 @@ public class LoginActivity extends AppCompatActivity {
         try {
             loginButton.setOnClickListener(v -> handleLogin());
             signUpButton.setOnClickListener(v -> navigateToSignUp());
+            quickLoginButton.setOnClickListener(v -> handleQuickLogin());
         } catch (Exception e) {
             Log.e(TAG, "Error setting up click listeners: " + e.getMessage(), e);
             Toast.makeText(this, "Error setting up buttons", Toast.LENGTH_SHORT).show();
@@ -340,6 +348,7 @@ public class LoginActivity extends AppCompatActivity {
             emailInput.setEnabled(!isLoading);
             passwordInput.setEnabled(!isLoading);
             signUpButton.setEnabled(!isLoading);
+            quickLoginButton.setEnabled(!isLoading);
         } catch (Exception e) {
             Log.e(TAG, "Error in showLoading: " + e.getMessage(), e);
         }
@@ -372,6 +381,7 @@ public class LoginActivity extends AppCompatActivity {
             passwordInput.setEnabled(enabled);
             loginButton.setEnabled(enabled);
             signUpButton.setEnabled(enabled);
+            quickLoginButton.setEnabled(enabled);
         } catch (Exception e) {
             Log.e(TAG, "Error setting login enabled state: " + e.getMessage(), e);
         }
@@ -389,5 +399,167 @@ public class LoginActivity extends AppCompatActivity {
         editor.remove(KEY_USER_EMAIL);
         editor.remove(KEY_USER_PASSWORD);
         editor.apply();
+    }
+
+    private void handleQuickLogin() {
+        try {
+            if (!isNetworkAvailable()) {
+                Toast.makeText(this, "No internet connection. Please check your network and try again.", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            showLoading(true);
+            setLoginEnabled(false);
+
+            // First, try to create the account if it doesn't exist
+            firebaseManager.createUser(DEMO_EMAIL, DEMO_PASSWORD, task -> {
+                if (task.isSuccessful() || (task.getException() instanceof FirebaseAuthException && 
+                    ((FirebaseAuthException) task.getException()).getErrorCode().equals("ERROR_EMAIL_ALREADY_IN_USE"))) {
+                    // If account creation was successful or account already exists, proceed with login
+                    firebaseManager.signIn(DEMO_EMAIL, DEMO_PASSWORD, signInTask -> {
+                        try {
+                            if (signInTask.isSuccessful() && signInTask.getResult() != null && 
+                                signInTask.getResult().getUser() != null) {
+                                String userId = signInTask.getResult().getUser().getUid();
+                                Log.d(TAG, "User signed in successfully with ID: " + userId);
+                                
+                                // Save credentials for auto-login
+                                saveUserCredentials(DEMO_EMAIL, DEMO_PASSWORD);
+                                
+                                // Get user data from Realtime Database
+                                firebaseManager.getUserData(userId, new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        try {
+                                            if (dataSnapshot.exists()) {
+                                                String name = dataSnapshot.child("name").getValue(String.class);
+                                                String userTypeValue = dataSnapshot.child("userType").getValue(String.class);
+                                                
+                                                if (name != null && userTypeValue != null) {
+                                                    // Save user data in background
+                                                    new Thread(() -> {
+                                                        try {
+                                                            VOHApplication.getInstance().getDataManager()
+                                                                    .saveUserData(userId, DEMO_EMAIL, name);
+                                                            VOHApplication.getInstance().getDataManager()
+                                                                    .saveUserType(userTypeValue);
+                                                            
+                                                            runOnUiThread(() -> {
+                                                                Log.d(TAG, "User data saved successfully");
+                                                                navigateToMain();
+                                                            });
+                                                        } catch (Exception e) {
+                                                            runOnUiThread(() -> {
+                                                                showLoading(false);
+                                                                setLoginEnabled(true);
+                                                                Log.e(TAG, "Error saving user data: " + e.getMessage(), e);
+                                                                Toast.makeText(LoginActivity.this,
+                                                                        "Error saving user data. Please try again.",
+                                                                        Toast.LENGTH_LONG).show();
+                                                            });
+                                                        }
+                                                    }).start();
+                                                } else {
+                                                    // If user data doesn't exist, create it
+                                                    createDemoUserData(userId);
+                                                }
+                                            } else {
+                                                // If user data doesn't exist, create it
+                                                createDemoUserData(userId);
+                                            }
+                                        } catch (Exception e) {
+                                            showLoading(false);
+                                            setLoginEnabled(true);
+                                            Log.e(TAG, "Error processing user data: " + e.getMessage(), e);
+                                            Toast.makeText(LoginActivity.this,
+                                                    "Error processing user data. Please try again.",
+                                                    Toast.LENGTH_LONG).show();
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+                                        showLoading(false);
+                                        setLoginEnabled(true);
+                                        Log.e(TAG, "Database error: " + databaseError.getMessage());
+                                        Toast.makeText(LoginActivity.this,
+                                                "Error accessing database. Please try again.",
+                                                Toast.LENGTH_LONG).show();
+                                    }
+                                });
+                            } else {
+                                showLoading(false);
+                                setLoginEnabled(true);
+                                String errorMessage = signInTask.getException() instanceof FirebaseAuthException ?
+                                        "Invalid email or password" :
+                                        "Login failed. Please try again.";
+                                Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                                Log.e(TAG, "Login error: " + signInTask.getException().getMessage());
+                            }
+                        } catch (Exception e) {
+                            showLoading(false);
+                            setLoginEnabled(true);
+                            Log.e(TAG, "Error during login: " + e.getMessage(), e);
+                            Toast.makeText(LoginActivity.this,
+                                    "Error during login. Please try again.",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } else {
+                    showLoading(false);
+                    setLoginEnabled(true);
+                    Log.e(TAG, "Error creating demo account: " + task.getException().getMessage());
+                    Toast.makeText(LoginActivity.this,
+                            "Error creating demo account. Please try again.",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        } catch (Exception e) {
+            showLoading(false);
+            setLoginEnabled(true);
+            Log.e(TAG, "Error in handleQuickLogin: " + e.getMessage(), e);
+            Toast.makeText(this, "Error processing quick login. Please try again.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void createDemoUserData(String userId) {
+        try {
+            // Create a basic user profile
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("name", "Demo User");
+            userData.put("email", DEMO_EMAIL);
+            userData.put("userType", "VOLUNTEER");
+            userData.put("createdAt", System.currentTimeMillis());
+
+            firebaseManager.getDatabase().getReference("users").child(userId)
+                    .setValue(userData)
+                    .addOnSuccessListener(aVoid -> {
+                        // Save user data to local preferences
+                        VOHApplication.getInstance().getDataManager()
+                                .saveUserData(userId, DEMO_EMAIL, "Demo User");
+                        VOHApplication.getInstance().getDataManager()
+                                .saveUserType("VOLUNTEER");
+                        
+                        runOnUiThread(() -> {
+                            Log.d(TAG, "Demo user data created successfully");
+                            navigateToMain();
+                        });
+                    })
+                    .addOnFailureListener(e -> {
+                        showLoading(false);
+                        setLoginEnabled(true);
+                        Log.e(TAG, "Error creating demo user data: " + e.getMessage());
+                        Toast.makeText(LoginActivity.this,
+                                "Error creating demo user data. Please try again.",
+                                Toast.LENGTH_LONG).show();
+                    });
+        } catch (Exception e) {
+            showLoading(false);
+            setLoginEnabled(true);
+            Log.e(TAG, "Error in createDemoUserData: " + e.getMessage(), e);
+            Toast.makeText(LoginActivity.this,
+                    "Error creating demo user data. Please try again.",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 } 

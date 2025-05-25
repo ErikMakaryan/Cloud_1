@@ -65,6 +65,7 @@ public class Opportunity {
     private String requirements;
     private String status;
     private String benefits;
+    private String applicationStatus; // Status of the user's application for this opportunity
 
     // Empty constructor for Firebase
     public Opportunity() {
@@ -357,5 +358,13 @@ public class Opportunity {
 
     public void setBenefits(String benefits) {
         this.benefits = benefits;
+    }
+
+    public String getApplicationStatus() {
+        return applicationStatus;
+    }
+
+    public void setApplicationStatus(String applicationStatus) {
+        this.applicationStatus = applicationStatus;
     }
 } 

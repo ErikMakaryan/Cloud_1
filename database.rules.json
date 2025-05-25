@@ -23,8 +23,8 @@
     "applications": {
       ".read": "auth != null",
       ".write": "auth != null",
-      "$opportunityId": {
-        "$userId": {
+      "$userId": {
+        "$opportunityId": {
           ".read": "auth != null && (auth.uid == $userId || root.child('opportunities').child($opportunityId).child('organizationId').val() == auth.uid)",
           ".write": "auth != null && (auth.uid == $userId || root.child('opportunities').child($opportunityId).child('organizationId').val() == auth.uid)"
         }

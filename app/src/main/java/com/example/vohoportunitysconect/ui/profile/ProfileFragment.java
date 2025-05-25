@@ -6,8 +6,10 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,11 +27,15 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.activities.EditProfileActivity;
 import com.example.vohoportunitysconect.activities.LoginActivity;
 import com.example.vohoportunitysconect.activities.SettingsActivity;
 import com.example.vohoportunitysconect.activities.CreateOpportunityActivity;
+import com.example.vohoportunitysconect.databinding.FragmentProfileBinding;
 import com.example.vohoportunitysconect.models.Certificate;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
@@ -58,8 +64,9 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 
 public class ProfileFragment extends Fragment {
+    private FragmentProfileBinding binding;
     private ShapeableImageView profileImage;
-    private TextView nameText, emailText, hoursText, applicationsCount;
+    private TextView nameText, emailText, hoursText;
     private MaterialButton editProfileButton, settingsButton, signOutButton, addHoursButton, deleteHoursButton, addCertificateButton;
     private FirebaseAuth mAuth;
     private DatabaseReference databaseRef;
@@ -70,6 +77,7 @@ public class ProfileFragment extends Fragment {
     private String pendingCertificateName;
     private RecyclerView certificatesRecyclerView;
     private CertificateAdapter certificateAdapter;
+    private Uri selectedImageUri;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -82,8 +90,8 @@ public class ProfileFragment extends Fragment {
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null) {
-                        Uri imageUri = result.getData().getData();
-                        uploadProfileImage(imageUri);
+                        selectedImageUri = result.getData().getData();
+                        uploadImage();
                     }
                 }
         );
@@ -106,31 +114,54 @@ public class ProfileFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_profile, container, false);
+        binding = FragmentProfileBinding.inflate(inflater, container, false);
 
-        profileImage = root.findViewById(R.id.profile_image);
-        nameText = root.findViewById(R.id.name_text);
-        emailText = root.findViewById(R.id.email_text);
-        hoursText = root.findViewById(R.id.hours_text);
-        applicationsCount = root.findViewById(R.id.applications_count);
-        editProfileButton = root.findViewById(R.id.add_hours_button);
-        settingsButton = root.findViewById(R.id.settings_button);
-        signOutButton = root.findViewById(R.id.sign_out_button);
-        addHoursButton = root.findViewById(R.id.add_hours_button);
-        deleteHoursButton = root.findViewById(R.id.delete_hours_button);
-        addCertificateButton = root.findViewById(R.id.add_certificate_button);
-        certificatesRecyclerView = root.findViewById(R.id.certificates_recycler_view);
+        profileImage = binding.profileImage;
+        nameText = binding.nameText;
+        emailText = binding.emailText;
+        hoursText = binding.hoursText;
+        editProfileButton = binding.addHoursButton;
+        settingsButton = binding.settingsButton;
+        signOutButton = binding.signOutButton;
+        addHoursButton = binding.addHoursButton;
+        deleteHoursButton = binding.deleteHoursButton;
+        addCertificateButton = binding.addCertificateButton;
+        certificatesRecyclerView = binding.certificatesRecyclerView;
 
         // Setup RecyclerView for certificates
         certificatesRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        certificateAdapter = new CertificateAdapter(new ArrayList<>());
+        certificateAdapter = new CertificateAdapter(new ArrayList<>(), new CertificateAdapter.OnCertificateClickListener() {
+            @Override
+            public void onCertificateClick(Certificate certificate) {
+                // Open certificate details
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(Uri.parse(certificate.getFileUrl()));
+                startActivity(intent);
+            }
+
+            @Override
+            public void onDeleteClick(Certificate certificate) {
+                showDeleteCertificateConfirmation(certificate);
+            }
+        });
         certificatesRecyclerView.setAdapter(certificateAdapter);
 
         setupClickListeners();
         checkAuthAndLoadData();
         loadCertificates(); // Load certificates when fragment is created
 
-        return root;
+        return binding.getRoot();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        
+        databaseRef = FirebaseDatabase.getInstance("https://vvoohh-e2b0a-default-rtdb.firebaseio.com").getReference();
+        storageRef = FirebaseStorage.getInstance().getReference();
+        
+        setupProfilePictureClick();
+        loadUserProfile();
     }
 
     private void checkAuthAndLoadData() {
@@ -191,15 +222,7 @@ public class ProfileFragment extends Fragment {
             }
         });
 
-        profileImage.setOnClickListener(v -> {
-            if (mAuth.getCurrentUser() != null) {
-                Intent intent = new Intent(Intent.ACTION_PICK);
-                intent.setType("image/*");
-                imagePickerLauncher.launch(intent);
-            } else {
-                Toast.makeText(getContext(), "Please sign in to change profile picture", Toast.LENGTH_SHORT).show();
-            }
-        });
+        profileImage.setOnClickListener(v -> showProfilePictureDialog());
 
         addHoursButton.setOnClickListener(v -> {
             if (mAuth.getCurrentUser() != null) {
@@ -226,6 +249,175 @@ public class ProfileFragment extends Fragment {
         });
     }
 
+    private void setupProfilePictureClick() {
+        binding.profileImage.setOnClickListener(v -> showProfilePictureDialog());
+    }
+
+    private void showProfilePictureDialog() {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_profile_picture, null);
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .create();
+
+        dialogView.findViewById(R.id.change_photo).setOnClickListener(v -> {
+            dialog.dismiss();
+            openGallery();
+        });
+
+        dialogView.findViewById(R.id.remove_photo).setOnClickListener(v -> {
+            dialog.dismiss();
+            removeProfilePicture();
+        });
+
+        dialog.show();
+    }
+
+    private void openGallery() {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        imagePickerLauncher.launch(intent);
+    }
+
+    private void uploadImage() {
+        if (selectedImageUri == null) return;
+
+        String userId = mAuth.getCurrentUser().getUid();
+        binding.progressBar.setVisibility(View.VISIBLE);
+
+        try {
+            // Create profile_images directory if it doesn't exist
+            File profileImagesDir = new File(requireContext().getFilesDir(), "profile_images");
+            if (!profileImagesDir.exists()) {
+                profileImagesDir.mkdirs();
+            }
+
+            // Create a unique filename for the profile image
+            String fileName = "profile_" + userId + ".jpg";
+            File profileImageFile = new File(profileImagesDir, fileName);
+
+            // Copy the image file
+            InputStream inputStream = requireContext().getContentResolver().openInputStream(selectedImageUri);
+            if (inputStream != null) {
+                FileOutputStream outputStream = new FileOutputStream(profileImageFile);
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                inputStream.close();
+                outputStream.close();
+
+                // Update profile image path in database
+                String imagePath = profileImageFile.getAbsolutePath();
+                databaseRef.child("users").child(userId).child("profileImagePath")
+                    .setValue(imagePath)
+                    .addOnSuccessListener(aVoid -> {
+                        binding.progressBar.setVisibility(View.GONE);
+                        loadProfileImage(imagePath);
+                        Toast.makeText(getContext(), "Profile picture updated successfully", 
+                            Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        binding.progressBar.setVisibility(View.GONE);
+                        Toast.makeText(getContext(), "Failed to update profile picture: " + e.getMessage(), 
+                            Toast.LENGTH_SHORT).show();
+                    });
+            } else {
+                binding.progressBar.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Error reading image file", Toast.LENGTH_SHORT).show();
+            }
+        } catch (IOException e) {
+            binding.progressBar.setVisibility(View.GONE);
+            Toast.makeText(getContext(), "Error saving image: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void removeProfilePicture() {
+        String userId = mAuth.getCurrentUser().getUid();
+        binding.progressBar.setVisibility(View.VISIBLE);
+
+        // Get the current profile image path
+        databaseRef.child("users").child(userId).child("profileImagePath")
+            .get()
+            .addOnSuccessListener(snapshot -> {
+                String imagePath = snapshot.getValue(String.class);
+                if (imagePath != null) {
+                    // Delete the local file
+                    File imageFile = new File(imagePath);
+                    if (imageFile.exists()) {
+                        imageFile.delete();
+                    }
+                }
+
+                // Remove from database
+                databaseRef.child("users").child(userId).child("profileImagePath")
+                    .removeValue()
+                    .addOnSuccessListener(aVoid -> {
+                        binding.progressBar.setVisibility(View.GONE);
+                        binding.profileImage.setImageResource(R.drawable.placeholder_profile);
+                        Toast.makeText(getContext(), "Profile picture removed successfully", 
+                            Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        binding.progressBar.setVisibility(View.GONE);
+                        Toast.makeText(getContext(), "Failed to remove profile picture: " + e.getMessage(), 
+                            Toast.LENGTH_SHORT).show();
+                    });
+            })
+            .addOnFailureListener(e -> {
+                binding.progressBar.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Error removing profile picture: " + e.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            });
+    }
+
+    private void loadProfileImage(String imagePath) {
+        if (imagePath != null && !imagePath.isEmpty()) {
+            File imageFile = new File(imagePath);
+            if (imageFile.exists()) {
+                Glide.with(this)
+                    .load(imageFile)
+                    .placeholder(R.drawable.placeholder_profile)
+                    .error(R.drawable.placeholder_profile)
+                    .diskCacheStrategy(DiskCacheStrategy.NONE)
+                    .skipMemoryCache(true)
+                    .circleCrop()
+                    .into(binding.profileImage);
+            } else {
+                binding.profileImage.setImageResource(R.drawable.placeholder_profile);
+            }
+        } else {
+            binding.profileImage.setImageResource(R.drawable.placeholder_profile);
+        }
+    }
+
+    private void loadUserProfile() {
+        String userId = mAuth.getCurrentUser().getUid();
+        binding.progressBar.setVisibility(View.VISIBLE);
+
+        databaseRef.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                binding.progressBar.setVisibility(View.GONE);
+                if (snapshot.exists()) {
+                    String name = snapshot.child("name").getValue(String.class);
+                    String email = snapshot.child("email").getValue(String.class);
+                    String profileImagePath = snapshot.child("profileImagePath").getValue(String.class);
+
+                    binding.nameText.setText(name);
+                    binding.emailText.setText(email);
+                    loadProfileImage(profileImagePath);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                binding.progressBar.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Error loading profile: " + error.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private void loadUserData() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
@@ -241,29 +433,6 @@ public class ProfileFragment extends Fragment {
                         Long hours = dataSnapshot.child("volunteerHours").getValue(Long.class);
                         hoursText.setText(hours != null ? String.valueOf(hours) : "0");
                         
-                        // Load pending applications count
-                        databaseRef.child("applications")
-                            .orderByChild("userId")
-                            .equalTo(userId)
-                            .addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                                    int pendingCount = 0;
-                                    for (DataSnapshot appSnapshot : snapshot.getChildren()) {
-                                        String status = appSnapshot.child("status").getValue(String.class);
-                                        if ("pending".equals(status)) {
-                                            pendingCount++;
-                                        }
-                                    }
-                                    applicationsCount.setText(String.valueOf(pendingCount));
-                                }
-
-                                @Override
-                                public void onCancelled(@NonNull DatabaseError error) {
-                                    applicationsCount.setText("0");
-                                }
-                            });
-                        
                         // Check if user is an organization
                         Boolean isOrganization = dataSnapshot.child("isOrganization").getValue(Boolean.class);
                         if (isOrganization != null && isOrganization) {
@@ -275,17 +444,8 @@ public class ProfileFragment extends Fragment {
                         }
                         
                         // Load profile image
-                        File imageFile = new File(requireContext().getFilesDir(), "profile_" + userId + ".jpg");
-                        if (imageFile.exists()) {
-                            Glide.with(ProfileFragment.this)
-                                .load(imageFile)
-                                .placeholder(R.drawable.placeholder_profile)
-                                .into(profileImage);
-                        } else {
-                            Glide.with(ProfileFragment.this)
-                                .load(R.drawable.placeholder_profile)
-                                .into(profileImage);
-                        }
+                        String profileImagePath = dataSnapshot.child("profileImagePath").getValue(String.class);
+                        loadProfileImage(profileImagePath);
                     }
                 }
 
@@ -294,77 +454,6 @@ public class ProfileFragment extends Fragment {
                     Toast.makeText(getContext(), "Error loading profile data", Toast.LENGTH_SHORT).show();
                 }
             });
-        }
-    }
-
-    private void uploadProfileImage(Uri imageUri) {
-        if (mAuth.getCurrentUser() != null) {
-            String userId = mAuth.getCurrentUser().getUid();
-            try {
-                // Get the input stream from the URI
-                InputStream inputStream = requireContext().getContentResolver().openInputStream(imageUri);
-                if (inputStream != null) {
-                    // Create a file in the app's private storage
-                    File imageFile = new File(requireContext().getFilesDir(), "profile_" + userId + ".jpg");
-                    FileOutputStream outputStream = new FileOutputStream(imageFile);
-                    
-                    // Copy the image data
-                    byte[] buffer = new byte[1024];
-                    int bytesRead;
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                        outputStream.write(buffer, 0, bytesRead);
-                    }
-                    
-                    // Close streams
-                    inputStream.close();
-                    outputStream.close();
-                    
-                    // Update the UI
-                    Glide.with(this)
-                        .load(imageFile)
-                        .placeholder(R.drawable.placeholder_profile)
-                        .into(profileImage);
-                    
-                    Toast.makeText(getContext(), "Profile picture updated!", Toast.LENGTH_SHORT).show();
-                    
-                    // Show options to change or remove profile picture
-                    showProfilePictureOptions();
-                }
-            } catch (IOException e) {
-                Toast.makeText(getContext(), "Error saving profile picture: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    private void showProfilePictureOptions() {
-        String[] options = {"Change Picture", "Remove Picture"};
-        new AlertDialog.Builder(requireContext())
-            .setTitle("Profile Picture")
-            .setItems(options, (dialog, which) -> {
-                if (which == 0) {
-                    // Change Picture
-                    Intent intent = new Intent(Intent.ACTION_PICK);
-                    intent.setType("image/*");
-                    imagePickerLauncher.launch(intent);
-                } else {
-                    // Remove Picture
-                    removeProfilePicture();
-                }
-            })
-            .show();
-    }
-
-    private void removeProfilePicture() {
-        if (mAuth.getCurrentUser() != null) {
-            String userId = mAuth.getCurrentUser().getUid();
-            File imageFile = new File(requireContext().getFilesDir(), "profile_" + userId + ".jpg");
-            if (imageFile.exists()) {
-                imageFile.delete();
-            }
-            Glide.with(this)
-                .load(R.drawable.placeholder_profile)
-                .into(profileImage);
-            Toast.makeText(getContext(), "Profile picture removed", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -608,5 +697,33 @@ public class ProfileFragment extends Fragment {
                         });
                 });
         }
+    }
+
+    private void showDeleteCertificateConfirmation(Certificate certificate) {
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Delete Certificate")
+            .setMessage("Are you sure you want to delete this certificate?")
+            .setPositiveButton("Delete", (dialog, which) -> deleteCertificate(certificate))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void deleteCertificate(Certificate certificate) {
+        String userId = mAuth.getCurrentUser().getUid();
+        databaseRef.child("users").child(userId).child("certificates").child(certificate.getId())
+            .removeValue()
+            .addOnSuccessListener(aVoid -> {
+                Toast.makeText(getContext(), "Certificate deleted successfully", Toast.LENGTH_SHORT).show();
+                loadCertificates(); // Refresh the certificates list
+            })
+            .addOnFailureListener(e -> {
+                Toast.makeText(getContext(), "Failed to delete certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
     }
 } 
