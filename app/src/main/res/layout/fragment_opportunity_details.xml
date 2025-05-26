@@ -95,6 +95,31 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/opportunity_title" />
 
+            <!-- Volunteering Days Section -->
+            <TextView
+                android:id="@+id/days_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:drawableStart="@drawable/ic_calendar"
+                android:drawablePadding="8dp"
+                android:text="Volunteering Days"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/opportunity_organization" />
+
+            <TextView
+                android:id="@+id/opportunity_days"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginStart="32dp"
+                android:textSize="14sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/days_title" />
+
             <!-- Location Section -->
             <TextView
                 android:id="@+id/location_title"
@@ -107,7 +132,7 @@
                 android:textSize="16sp"
                 android:textStyle="bold"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/opportunity_organization" />
+                app:layout_constraintTop_toBottomOf="@id/opportunity_days" />
 
             <TextView
                 android:id="@+id/opportunity_location"

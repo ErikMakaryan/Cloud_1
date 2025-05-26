@@ -185,6 +185,19 @@ public class OpportunityDetailsFragment extends Fragment {
             
             // Update visibility and text in a single pass
             updateSectionVisibility(binding.locationTitle, binding.opportunityLocation, opportunity.getLocation());
+            
+            // Update volunteering days
+            if (opportunity.getStartDate() != null && opportunity.getEndDate() != null) {
+                binding.daysTitle.setVisibility(View.VISIBLE);
+                binding.opportunityDays.setVisibility(View.VISIBLE);
+                binding.opportunityDays.setText(String.format("%s to %s", 
+                    opportunity.getStartDate(), 
+                    opportunity.getEndDate()));
+            } else {
+                binding.daysTitle.setVisibility(View.GONE);
+                binding.opportunityDays.setVisibility(View.GONE);
+            }
+            
             updateSectionVisibility(binding.descriptionTitle, binding.opportunityDescription, opportunity.getDescription());
             updateSectionVisibility(binding.requirementsTitle, binding.opportunityRequirements, opportunity.getRequirements());
             updateSectionVisibility(binding.benefitsTitle, binding.opportunityBenefits, opportunity.getBenefits());
@@ -327,45 +340,26 @@ public class OpportunityDetailsFragment extends Fragment {
             // First update the button state
             updateApplyButtonState(true);
             
-            // Get organizer's email
-            databaseRef.child("users").child(currentOpportunity.getOrganizationId())
-                .child("email")
-                .get()
-                .addOnSuccessListener(emailSnapshot -> {
-                    String organizerEmail = emailSnapshot.getValue(String.class);
-                    if (organizerEmail != null && !organizerEmail.isEmpty()) {
-                        String subject = "Application for: " + currentOpportunity.getTitle();
-                        String body = "Hello,\n\nI am interested in applying for the opportunity '" + 
-                            currentOpportunity.getTitle() + "' at " + currentOpportunity.getOrganization() + 
-                            ".\n\nPlease let me know about the next steps.\n\nThank you!";
-                        
-                        Intent emailIntent = new Intent(Intent.ACTION_SEND);
-                        emailIntent.setType("message/rfc822");
-                        emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{organizerEmail});
-                        emailIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
-                        emailIntent.putExtra(Intent.EXTRA_TEXT, body);
-                        
-                        try {
-                            currentUserId = userId;
-                            currentOpportunityId = currentOpportunity.getId();
-                            emailLauncher.launch(Intent.createChooser(emailIntent, "Send email..."));
-                        } catch (android.content.ActivityNotFoundException ex) {
-                            Toast.makeText(getContext(), "No email clients installed.", Toast.LENGTH_SHORT).show();
-                            // Revert button state if email client is not available
-                            updateApplyButtonState(false);
-                        }
-                    } else {
-                        Toast.makeText(getContext(), "Organizer email not available.", Toast.LENGTH_SHORT).show();
-                        // Revert button state if email is not available
-                        updateApplyButtonState(false);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(getContext(), "Error getting organizer email: " + e.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
-                    // Revert button state if there's an error
-                    updateApplyButtonState(false);
-                });
+            String subject = "Application for: " + currentOpportunity.getTitle();
+            String body = "Hello,\n\nI am interested in applying for the opportunity '" + 
+                currentOpportunity.getTitle() + "' at " + currentOpportunity.getOrganization() + 
+                ".\n\nPlease let me know about the next steps.\n\nThank you!";
+            
+            Intent emailIntent = new Intent(Intent.ACTION_SEND);
+            emailIntent.setType("message/rfc822");
+            emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{"erikmakaryan3@gmail.com"});
+            emailIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
+            emailIntent.putExtra(Intent.EXTRA_TEXT, body);
+            
+            try {
+                currentUserId = userId;
+                currentOpportunityId = currentOpportunity.getId();
+                emailLauncher.launch(Intent.createChooser(emailIntent, "Send email..."));
+            } catch (android.content.ActivityNotFoundException ex) {
+                Toast.makeText(getContext(), "No email clients installed.", Toast.LENGTH_SHORT).show();
+                // Revert button state if email client is not available
+                updateApplyButtonState(false);
+            }
         } else {
             Toast.makeText(getContext(), "Please sign in to apply", Toast.LENGTH_SHORT).show();
         }

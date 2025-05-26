@@ -70,6 +70,8 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
+import androidx.core.content.ContextCompat;
+
 public class ProfileFragment extends Fragment {
     private FragmentProfileBinding binding;
     private ShapeableImageView profileImage;
@@ -122,7 +124,9 @@ public class ProfileFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         binding = FragmentProfileBinding.inflate(inflater, container, false);
+        View root = binding.getRoot();
 
+        // Initialize views
         profileImage = binding.profileImage;
         nameText = binding.nameText;
         emailText = binding.emailText;
@@ -134,6 +138,13 @@ public class ProfileFragment extends Fragment {
         deleteHoursButton = binding.deleteHoursButton;
         addCertificateButton = binding.addCertificateButton;
         certificatesRecyclerView = binding.certificatesRecyclerView;
+
+        // Verify view initialization
+        if (nameText == null) {
+            Log.e("ProfileFragment", "nameText is null after initialization");
+        } else {
+            Log.d("ProfileFragment", "nameText initialized successfully");
+        }
 
         // Setup RecyclerView for certificates
         certificatesRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -154,7 +165,7 @@ public class ProfileFragment extends Fragment {
         checkAuthAndLoadData();
         loadCertificates(); // Load certificates when fragment is created
 
-        return binding.getRoot();
+        return root;
     }
 
     @Override
@@ -165,12 +176,11 @@ public class ProfileFragment extends Fragment {
         storageRef = FirebaseStorage.getInstance().getReference();
         
         setupProfilePictureClick();
-        loadUserProfile();
     }
 
     private void checkAuthAndLoadData() {
         if (mAuth.getCurrentUser() != null) {
-            loadUserData();
+            loadUserProfile();
         } else {
             // User is not authenticated, redirect to login
             startActivity(new Intent(getContext(), LoginActivity.class));
@@ -394,51 +404,83 @@ public class ProfileFragment extends Fragment {
         }
     }
 
-    private void loadUserProfile() {
-        String userId = mAuth.getCurrentUser().getUid();
-        binding.progressBar.setVisibility(View.VISIBLE);
-
-        databaseRef.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                binding.progressBar.setVisibility(View.GONE);
-                if (snapshot.exists()) {
-                    String name = snapshot.child("name").getValue(String.class);
-                    String email = snapshot.child("email").getValue(String.class);
-                    String profileImagePath = snapshot.child("profileImagePath").getValue(String.class);
-
-                    binding.nameText.setText(name);
-                    binding.emailText.setText(email);
-                    loadProfileImage(profileImagePath);
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                binding.progressBar.setVisibility(View.GONE);
-                Toast.makeText(getContext(), "Error loading profile: " + error.getMessage(), 
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
+    private int getRandomColor() {
+        int[] colors = {
+            android.R.color.holo_blue_dark,
+            android.R.color.holo_green_dark,
+            android.R.color.holo_orange_dark,
+            android.R.color.holo_purple,
+            android.R.color.holo_red_dark,
+            android.R.color.holo_blue_light,
+            android.R.color.holo_green_light,
+            android.R.color.holo_orange_light,
+            android.R.color.holo_red_light
+        };
+        return ContextCompat.getColor(requireContext(), colors[(int) (Math.random() * colors.length)]);
     }
 
-    private void loadUserData() {
+    private void loadUserProfile() {
         if (mAuth.getCurrentUser() != null) {
             String userId = mAuth.getCurrentUser().getUid();
+            String email = mAuth.getCurrentUser().getEmail();
+            String displayName = mAuth.getCurrentUser().getDisplayName();
+            
+            Log.d("ProfileFragment", "Loading profile for user: " + userId);
+            Log.d("ProfileFragment", "Email from Auth: " + email);
+            Log.d("ProfileFragment", "Name from Auth: " + displayName);
+            
+            // Set email from Auth
+            if (email != null) {
+                emailText.setText(email);
+                emailText.setTextColor(getRandomColor());
+                Log.d("ProfileFragment", "Email set to TextView: " + email);
+            } else {
+                Log.e("ProfileFragment", "Email is null in Auth");
+            }
+            
+            // Set name from Auth
+            if (displayName != null && !displayName.isEmpty()) {
+                nameText.setText(displayName);
+                nameText.setTextColor(getRandomColor());
+                Log.d("ProfileFragment", "Name set to TextView: " + displayName);
+            } else {
+                // If no display name in Auth, try to get it from database
+                databaseRef.child("users").child(userId).child("name")
+                    .get()
+                    .addOnSuccessListener(snapshot -> {
+                        String name = snapshot.getValue(String.class);
+                        if (name != null) {
+                            nameText.setText(name);
+                            nameText.setTextColor(getRandomColor());
+                            Log.d("ProfileFragment", "Name set from database: " + name);
+                        } else {
+                            nameText.setText("User");
+                            nameText.setTextColor(getRandomColor());
+                            Log.e("ProfileFragment", "No name found in database");
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        nameText.setText("User");
+                        nameText.setTextColor(getRandomColor());
+                        Log.e("ProfileFragment", "Error getting name from database: " + e.getMessage());
+                    });
+            }
+            
+            // Load other user data from database
             databaseRef.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    if (dataSnapshot.exists()) {
-                        // Load basic user info
-                        nameText.setText(dataSnapshot.child("name").getValue(String.class));
-                        emailText.setText(dataSnapshot.child("email").getValue(String.class));
-                        
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
                         // Load statistics
-                        Long hours = dataSnapshot.child("volunteerHours").getValue(Long.class);
-                        hoursText.setText(hours != null ? String.valueOf(hours) : "0");
+                        Long hours = snapshot.child("volunteerHours").getValue(Long.class);
+                        if (hours != null) {
+                            hoursText.setText(String.valueOf(hours));
+                        } else {
+                            hoursText.setText("0");
+                        }
                         
                         // Check if user is an organization
-                        Boolean isOrganization = dataSnapshot.child("isOrganization").getValue(Boolean.class);
+                        Boolean isOrganization = snapshot.child("isOrganization").getValue(Boolean.class);
                         if (isOrganization != null && isOrganization) {
                             addHoursButton.setVisibility(View.GONE);
                             deleteHoursButton.setVisibility(View.GONE);
@@ -448,87 +490,21 @@ public class ProfileFragment extends Fragment {
                         }
                         
                         // Load profile image
-                        String profileImagePath = dataSnapshot.child("profileImagePath").getValue(String.class);
-                        loadProfileImage(profileImagePath);
+                        String profileImagePath = snapshot.child("profileImagePath").getValue(String.class);
+                        if (profileImagePath != null && !profileImagePath.isEmpty()) {
+                            loadProfileImage(profileImagePath);
+                        }
                     }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
-                    Toast.makeText(getContext(), "Error loading profile data", Toast.LENGTH_SHORT).show();
+                    Log.e("ProfileFragment", "Error loading profile data: " + error.getMessage());
+                    Toast.makeText(getContext(), "Error loading profile data: " + error.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
-        }
-    }
-
-    @SuppressLint("SetTextI18n")
-    private void uploadCertificate(Uri certificateUri, String name) {
-        if (mAuth.getCurrentUser() != null) {
-            String userId = mAuth.getCurrentUser().getUid();
-            
-            // Show loading dialog
-            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
-            View dialogView = getLayoutInflater().inflate(R.layout.dialog_loading, null);
-            TextView messageText = dialogView.findViewById(R.id.loading_message);
-            messageText.setText("Uploading certificate...");
-            builder.setView(dialogView);
-            builder.setCancelable(false);
-            androidx.appcompat.app.AlertDialog loadingDialog = builder.create();
-            loadingDialog.show();
-
-            try {
-                // Create certificates directory if it doesn't exist
-                File certificatesDir = new File(requireContext().getFilesDir(), "certificates");
-                if (!certificatesDir.exists()) {
-                    certificatesDir.mkdirs();
-                }
-
-                // Create a unique filename for the certificate
-                String fileName = "cert_" + userId + "_" + System.currentTimeMillis() + ".pdf";
-                File certificateFile = new File(certificatesDir, fileName);
-
-                // Copy the certificate file
-                InputStream inputStream = requireContext().getContentResolver().openInputStream(certificateUri);
-                if (inputStream != null) {
-                    FileOutputStream outputStream = new FileOutputStream(certificateFile);
-                    byte[] buffer = new byte[1024];
-                    int bytesRead;
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                        outputStream.write(buffer, 0, bytesRead);
-                    }
-                    inputStream.close();
-                    outputStream.close();
-
-                    // Save certificate metadata
-                    Certificate certificate = new Certificate();
-                    certificate.setName(name);
-                    certificate.setFilePath(certificateFile.getAbsolutePath());
-                    certificate.setFileUrl(certificateUri.toString());
-                    certificate.setUploadDate(System.currentTimeMillis());
-
-                    // Add to database
-                    String certificateId = databaseRef.child("users").child(userId).child("certificates").push().getKey();
-                    if (certificateId != null) {
-                        databaseRef.child("users").child(userId).child("certificates").child(certificateId)
-                            .setValue(certificate)
-                            .addOnSuccessListener(aVoid -> {
-                                loadingDialog.dismiss();
-                                Toast.makeText(getContext(), "Certificate uploaded successfully", Toast.LENGTH_SHORT).show();
-                                loadCertificates(); // Refresh certificates list
-                            })
-                            .addOnFailureListener(e -> {
-                                loadingDialog.dismiss();
-                                Toast.makeText(getContext(), "Error uploading certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                            });
-                    }
-                } else {
-                    loadingDialog.dismiss();
-                    Toast.makeText(getContext(), "Error reading certificate file", Toast.LENGTH_SHORT).show();
-                }
-            } catch (IOException e) {
-                loadingDialog.dismiss();
-                Toast.makeText(getContext(), "Error saving certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
+        } else {
+            Log.e("ProfileFragment", "No current user found");
         }
     }
 
@@ -658,7 +634,7 @@ public class ProfileFragment extends Fragment {
                                     .updateChildren(updates)
                                     .addOnSuccessListener(aVoid -> {
                                         Toast.makeText(getContext(), "Hours deleted successfully", Toast.LENGTH_SHORT).show();
-                                        loadUserData(); // Refresh the profile data
+                                        loadUserProfile(); // Refresh the profile data
                                     })
                                     .addOnFailureListener(e -> {
                                         Toast.makeText(getContext(), "Error deleting hours", Toast.LENGTH_SHORT).show();
@@ -694,7 +670,7 @@ public class ProfileFragment extends Fragment {
                         .updateChildren(updates)
                         .addOnSuccessListener(aVoid -> {
                             Toast.makeText(getContext(), "Hours added successfully", Toast.LENGTH_SHORT).show();
-                            loadUserData(); // Refresh the profile data
+                            loadUserProfile(); // Refresh the profile data
                         })
                         .addOnFailureListener(e -> {
                             Toast.makeText(getContext(), "Error adding hours", Toast.LENGTH_SHORT).show();
@@ -799,6 +775,77 @@ public class ProfileFragment extends Fragment {
             
         } catch (IOException e) {
             Toast.makeText(getContext(), "Error showing preview: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private void uploadCertificate(Uri certificateUri, String name) {
+        if (mAuth.getCurrentUser() != null) {
+            String userId = mAuth.getCurrentUser().getUid();
+            
+            // Show loading dialog
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
+            View dialogView = getLayoutInflater().inflate(R.layout.dialog_loading, null);
+            TextView messageText = dialogView.findViewById(R.id.loading_message);
+            messageText.setText("Uploading certificate...");
+            builder.setView(dialogView);
+            builder.setCancelable(false);
+            androidx.appcompat.app.AlertDialog loadingDialog = builder.create();
+            loadingDialog.show();
+
+            try {
+                // Create certificates directory if it doesn't exist
+                File certificatesDir = new File(requireContext().getFilesDir(), "certificates");
+                if (!certificatesDir.exists()) {
+                    certificatesDir.mkdirs();
+                }
+
+                // Create a unique filename for the certificate
+                String fileName = "cert_" + userId + "_" + System.currentTimeMillis() + ".pdf";
+                File certificateFile = new File(certificatesDir, fileName);
+
+                // Copy the certificate file
+                InputStream inputStream = requireContext().getContentResolver().openInputStream(certificateUri);
+                if (inputStream != null) {
+                    FileOutputStream outputStream = new FileOutputStream(certificateFile);
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                    inputStream.close();
+                    outputStream.close();
+
+                    // Save certificate metadata
+                    Certificate certificate = new Certificate();
+                    certificate.setName(name);
+                    certificate.setFilePath(certificateFile.getAbsolutePath());
+                    certificate.setFileUrl(certificateUri.toString());
+                    certificate.setUploadDate(System.currentTimeMillis());
+
+                    // Add to database
+                    String certificateId = databaseRef.child("users").child(userId).child("certificates").push().getKey();
+                    if (certificateId != null) {
+                        databaseRef.child("users").child(userId).child("certificates").child(certificateId)
+                            .setValue(certificate)
+                            .addOnSuccessListener(aVoid -> {
+                                loadingDialog.dismiss();
+                                Toast.makeText(getContext(), "Certificate uploaded successfully", Toast.LENGTH_SHORT).show();
+                                loadCertificates(); // Refresh certificates list
+                            })
+                            .addOnFailureListener(e -> {
+                                loadingDialog.dismiss();
+                                Toast.makeText(getContext(), "Error uploading certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            });
+                    }
+                } else {
+                    loadingDialog.dismiss();
+                    Toast.makeText(getContext(), "Error reading certificate file", Toast.LENGTH_SHORT).show();
+                }
+            } catch (IOException e) {
+                loadingDialog.dismiss();
+                Toast.makeText(getContext(), "Error saving certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 

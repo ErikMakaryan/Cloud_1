@@ -33,6 +33,9 @@ import com.google.firebase.database.ValueEventListener;
 import com.example.vohoportunitysconect.firebase.FirebaseManager;
 import java.util.HashMap;
 import java.util.Map;
+import com.example.vohoportunitysconect.databinding.ActivityLoginBinding;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.firebase.auth.FirebaseUser;
 
 public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
@@ -50,76 +53,74 @@ public class LoginActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private FirebaseManager firebaseManager;
     private SharedPreferences sharedPreferences;
+    private ActivityLoginBinding binding;
+    private FirebaseAuth mAuth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        try {
-            setContentView(R.layout.activity_login);
+        binding = ActivityLoginBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
-            // Initialize views first
-            initializeViews();
+        mAuth = FirebaseAuth.getInstance();
 
-            // Initialize SharedPreferences
-            sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        // Initialize views first
+        initializeViews();
 
-            // Check if application is initialized
-            if (!VOHApplication.getInstance().isInitialized()) {
-                Toast.makeText(this, "Application not initialized properly. Please restart the app.", Toast.LENGTH_LONG).show();
-                finish();
-                return;
-            }
+        // Initialize SharedPreferences
+        sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
 
-            // Check Google Play Services availability
-            int googlePlayServicesStatus = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
-            if (googlePlayServicesStatus != ConnectionResult.SUCCESS) {
-                if (GoogleApiAvailability.getInstance().isUserResolvableError(googlePlayServicesStatus)) {
-                    GoogleApiAvailability.getInstance().getErrorDialog(this, googlePlayServicesStatus, 9000).show();
-                } else {
-                    Toast.makeText(this, "This device is not supported", Toast.LENGTH_SHORT).show();
-                    finish();
-                }
-                return;
-            }
-
-            // Get FirebaseManager instance from VOHApplication
-            try {
-                firebaseManager = VOHApplication.getInstance().getFirebaseManager();
-            } catch (IllegalStateException e) {
-                Log.e(TAG, "Error getting FirebaseManager: " + e.getMessage());
-                Toast.makeText(this, "Error initializing Firebase. Please restart the app.", Toast.LENGTH_LONG).show();
-                finish();
-                return;
-            }
-
-            // Setup click listeners
-            setupClickListeners();
-
-            // Check if user credentials are saved
-            // String savedEmail = sharedPreferences.getString(KEY_USER_EMAIL, null);
-            // String savedPassword = sharedPreferences.getString(KEY_USER_PASSWORD, null);
-
-            // if (savedEmail != null && savedPassword != null) {
-            //     emailInput.setText(savedEmail);
-            //     passwordInput.setText(savedPassword);
-            //     handleLogin();
-            // }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
-            Toast.makeText(this, "Error initializing app: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        // Check if application is initialized
+        if (!VOHApplication.getInstance().isInitialized()) {
+            Toast.makeText(this, "Application not initialized properly. Please restart the app.", Toast.LENGTH_LONG).show();
             finish();
+            return;
         }
+
+        // Check Google Play Services availability
+        int googlePlayServicesStatus = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
+        if (googlePlayServicesStatus != ConnectionResult.SUCCESS) {
+            if (GoogleApiAvailability.getInstance().isUserResolvableError(googlePlayServicesStatus)) {
+                GoogleApiAvailability.getInstance().getErrorDialog(this, googlePlayServicesStatus, 9000).show();
+            } else {
+                Toast.makeText(this, "This device is not supported", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+            return;
+        }
+
+        // Get FirebaseManager instance from VOHApplication
+        try {
+            firebaseManager = VOHApplication.getInstance().getFirebaseManager();
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting FirebaseManager: " + e.getMessage());
+            Toast.makeText(this, "Error initializing Firebase. Please restart the app.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
+        // Setup click listeners
+        setupClickListeners();
+
+        // Check if user credentials are saved
+        // String savedEmail = sharedPreferences.getString(KEY_USER_EMAIL, null);
+        // String savedPassword = sharedPreferences.getString(KEY_USER_PASSWORD, null);
+
+        // if (savedEmail != null && savedPassword != null) {
+        //     emailInput.setText(savedEmail);
+        //     passwordInput.setText(savedPassword);
+        //     handleLogin();
+        // }
     }
 
     private void initializeViews() {
         try {
-            emailInput = findViewById(R.id.email_input);
-            passwordInput = findViewById(R.id.password_input);
-            loginButton = findViewById(R.id.login_button);
-            signUpButton = findViewById(R.id.signup_button);
-            quickLoginButton = findViewById(R.id.quick_login_button);
-            progressBar = findViewById(R.id.progress_bar);
+            emailInput = binding.emailInput;
+            passwordInput = binding.passwordInput;
+            loginButton = binding.loginButton;
+            signUpButton = binding.signupButton;
+            quickLoginButton = binding.quickLoginButton;
+            progressBar = binding.progressBar;
 
             if (emailInput == null || passwordInput == null || loginButton == null || 
                 signUpButton == null || quickLoginButton == null || progressBar == null) {
@@ -177,7 +178,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private void setupClickListeners() {
         try {
-            loginButton.setOnClickListener(v -> handleLogin());
+            loginButton.setOnClickListener(v -> loginUser());
             signUpButton.setOnClickListener(v -> navigateToSignUp());
             quickLoginButton.setOnClickListener(v -> handleQuickLogin());
         } catch (Exception e) {
@@ -191,165 +192,85 @@ public class LoginActivity extends AppCompatActivity {
         return NetworkManager.getInstance(this).isNetworkAvailable();
     }
 
-    private void handleLogin() {
-        try {
-            String email = emailInput.getText().toString().trim();
-            String password = passwordInput.getText().toString().trim();
+    private void loginUser() {
+        String email = emailInput.getText().toString().trim();
+        String password = passwordInput.getText().toString().trim();
 
-            if (!isNetworkAvailable()) {
-                Toast.makeText(this, "No internet connection. Please check your network and try again.", Toast.LENGTH_LONG).show();
-                return;
-            }
+        // Validate inputs
+        if (email.isEmpty() || password.isEmpty()) {
+            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            if (validateInput(email, password)) {
-                showLoading(true);
-                
-                // Disable UI elements during login
-                setLoginEnabled(false);
-                
-                firebaseManager.signIn(email, password, task -> {
-                    try {
-                        if (task.isSuccessful() && task.getResult() != null && task.getResult().getUser() != null) {
-                            String userId = task.getResult().getUser().getUid();
-                            Log.d(TAG, "User signed in successfully with ID: " + userId);
-                            
-                            // Save credentials for auto-login
-                            saveUserCredentials(email, password);
-                            
-                            // Get user data from Realtime Database
-                            firebaseManager.getUserData(userId, new ValueEventListener() {
-                                @Override
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    try {
-                                        if (dataSnapshot.exists()) {
-                                            String name = dataSnapshot.child("name").getValue(String.class);
-                                            String userTypeValue = dataSnapshot.child("userType").getValue(String.class);
-                                            
-                                            if (name != null && userTypeValue != null) {
-                                                // Save user data in background
-                                                new Thread(() -> {
-                                                    try {
-                                                        VOHApplication.getInstance().getDataManager()
-                                                                .saveUserData(userId, email, name);
-                                                        VOHApplication.getInstance().getDataManager()
-                                                                .saveUserType(userTypeValue);
-                                                        
-                                                        runOnUiThread(() -> {
-                                                            Log.d(TAG, "User data saved successfully");
-                                                            navigateToMain();
-                                                        });
-                                                    } catch (Exception e) {
-                                                        runOnUiThread(() -> {
-                                                            showLoading(false);
-                                                            setLoginEnabled(true);
-                                                            Log.e(TAG, "Error saving user data: " + e.getMessage(), e);
-                                                            Toast.makeText(LoginActivity.this,
-                                                                    "Error saving user data. Please try again.",
-                                                                    Toast.LENGTH_LONG).show();
-                                                        });
-                                                    }
-                                                }).start();
-                                            } else {
-                                                showLoading(false);
-                                                setLoginEnabled(true);
-                                                Log.e(TAG, "User data is incomplete");
-                                                Toast.makeText(LoginActivity.this,
-                                                        "Error: User data is incomplete. Please contact support.",
-                                                        Toast.LENGTH_LONG).show();
-                                            }
-                                        } else {
-                                            showLoading(false);
-                                            setLoginEnabled(true);
-                                            Log.e(TAG, "User data not found");
-                                            Toast.makeText(LoginActivity.this,
-                                                    "Error: User data not found. Please contact support.",
-                                                    Toast.LENGTH_LONG).show();
-                                        }
-                                    } catch (Exception e) {
-                                        showLoading(false);
-                                        setLoginEnabled(true);
-                                        Log.e(TAG, "Error processing user data: " + e.getMessage(), e);
-                                        Toast.makeText(LoginActivity.this,
-                                                "Error processing user data. Please try again.",
-                                                Toast.LENGTH_LONG).show();
-                                    }
-                                }
+        // Show loading dialog
+        progressBar.setVisibility(View.VISIBLE);
+        loginButton.setEnabled(false);
 
-                                @Override
-                                public void onCancelled(DatabaseError databaseError) {
-                                    showLoading(false);
-                                    setLoginEnabled(true);
-                                    Log.e(TAG, "Database error: " + databaseError.getMessage());
-                                    Toast.makeText(LoginActivity.this,
-                                            "Error accessing database. Please try again.",
-                                            Toast.LENGTH_LONG).show();
-                                }
-                            });
+        // Sign in user
+        mAuth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    FirebaseUser user = mAuth.getCurrentUser();
+                    if (user != null) {
+                        if (user.isEmailVerified()) {
+                            // Email is verified, proceed to main activity
+                            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                            finish();
                         } else {
-                            showLoading(false);
-                            setLoginEnabled(true);
-                            String errorMessage = task.getException() instanceof FirebaseAuthException ?
-                                    "Invalid email or password" :
-                                    "Login failed. Please try again.";
-                            Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
-                            Log.e(TAG, "Login error: " + task.getException().getMessage());
+                            // Email is not verified
+                            showVerificationRequiredDialog(user);
                         }
-                    } catch (Exception e) {
-                        showLoading(false);
-                        setLoginEnabled(true);
-                        Log.e(TAG, "Error during login: " + e.getMessage(), e);
-                        Toast.makeText(LoginActivity.this,
-                                "Error during login. Please try again.",
-                                Toast.LENGTH_LONG).show();
                     }
-                });
-            }
-        } catch (Exception e) {
-            showLoading(false);
-            setLoginEnabled(true);
-            Log.e(TAG, "Error in handleLogin: " + e.getMessage(), e);
-            Toast.makeText(this, "Error processing login. Please try again.", Toast.LENGTH_LONG).show();
-        }
+                } else {
+                    progressBar.setVisibility(View.GONE);
+                    loginButton.setEnabled(true);
+                    Toast.makeText(LoginActivity.this,
+                        "Login failed: " + task.getException().getMessage(),
+                        Toast.LENGTH_SHORT).show();
+                }
+            });
     }
 
-    private boolean validateInput(String email, String password) {
-        try {
-            boolean isValid = true;
-            
-            if (email == null || email.trim().isEmpty()) {
-                emailInput.setError("Email is required");
-                isValid = false;
-            } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                emailInput.setError("Please enter a valid email address");
-                isValid = false;
-            }
-            
-            if (password == null || password.trim().isEmpty()) {
-                passwordInput.setError("Password is required");
-                isValid = false;
-            } else if (password.length() < 6) {
-                passwordInput.setError("Password must be at least 6 characters");
-                isValid = false;
-            }
-            
-            return isValid;
-        } catch (Exception e) {
-            Log.e(TAG, "Error in validateInput: " + e.getMessage(), e);
-            Toast.makeText(this, "Error validating input", Toast.LENGTH_SHORT).show();
-            return false;
-        }
+    private void showVerificationRequiredDialog(FirebaseUser user) {
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Email Not Verified")
+            .setMessage("Please verify your email before logging in. Would you like to resend the verification email?")
+            .setPositiveButton("Resend", (dialog, which) -> {
+                user.sendEmailVerification()
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            Toast.makeText(LoginActivity.this,
+                                "Verification email sent. Please check your inbox.",
+                                Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(LoginActivity.this,
+                                "Failed to send verification email: " + task.getException().getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                        }
+                        // Sign out the user
+                        mAuth.signOut();
+                        progressBar.setVisibility(View.GONE);
+                        loginButton.setEnabled(true);
+                    });
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> {
+                // Sign out the user
+                mAuth.signOut();
+                progressBar.setVisibility(View.GONE);
+                loginButton.setEnabled(true);
+            })
+            .setCancelable(false)
+            .show();
     }
 
-    private void showLoading(boolean isLoading) {
-        try {
-            progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-            loginButton.setEnabled(!isLoading);
-            emailInput.setEnabled(!isLoading);
-            passwordInput.setEnabled(!isLoading);
-            signUpButton.setEnabled(!isLoading);
-            quickLoginButton.setEnabled(!isLoading);
-        } catch (Exception e) {
-            Log.e(TAG, "Error in showLoading: " + e.getMessage(), e);
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Check if user is signed in and email is verified
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser != null && currentUser.isEmailVerified()) {
+            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+            finish();
         }
     }
 
@@ -374,32 +295,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void setLoginEnabled(boolean enabled) {
-        try {
-            emailInput.setEnabled(enabled);
-            passwordInput.setEnabled(enabled);
-            loginButton.setEnabled(enabled);
-            signUpButton.setEnabled(enabled);
-            quickLoginButton.setEnabled(enabled);
-        } catch (Exception e) {
-            Log.e(TAG, "Error setting login enabled state: " + e.getMessage(), e);
-        }
-    }
-
-    private void saveUserCredentials(String email, String password) {
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(KEY_USER_EMAIL, email);
-        editor.putString(KEY_USER_PASSWORD, password);
-        editor.apply();
-    }
-
-    private void clearUserCredentials() {
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.remove(KEY_USER_EMAIL);
-        editor.remove(KEY_USER_PASSWORD);
-        editor.apply();
-    }
-
     private void handleQuickLogin() {
         try {
             if (!isNetworkAvailable()) {
@@ -407,8 +302,8 @@ public class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            showLoading(true);
-            setLoginEnabled(false);
+            progressBar.setVisibility(View.VISIBLE);
+            loginButton.setEnabled(false);
 
             // First, try to create the account if it doesn't exist
             firebaseManager.createUser(DEMO_EMAIL, DEMO_PASSWORD, task -> {
@@ -449,8 +344,8 @@ public class LoginActivity extends AppCompatActivity {
                                                             });
                                                         } catch (Exception e) {
                                                             runOnUiThread(() -> {
-                                                                showLoading(false);
-                                                                setLoginEnabled(true);
+                                                                progressBar.setVisibility(View.GONE);
+                                                                loginButton.setEnabled(true);
                                                                 Log.e(TAG, "Error saving user data: " + e.getMessage(), e);
                                                                 Toast.makeText(LoginActivity.this,
                                                                         "Error saving user data. Please try again.",
@@ -467,8 +362,8 @@ public class LoginActivity extends AppCompatActivity {
                                                 createDemoUserData(userId);
                                             }
                                         } catch (Exception e) {
-                                            showLoading(false);
-                                            setLoginEnabled(true);
+                                            progressBar.setVisibility(View.GONE);
+                                            loginButton.setEnabled(true);
                                             Log.e(TAG, "Error processing user data: " + e.getMessage(), e);
                                             Toast.makeText(LoginActivity.this,
                                                     "Error processing user data. Please try again.",
@@ -478,8 +373,8 @@ public class LoginActivity extends AppCompatActivity {
 
                                     @Override
                                     public void onCancelled(DatabaseError databaseError) {
-                                        showLoading(false);
-                                        setLoginEnabled(true);
+                                        progressBar.setVisibility(View.GONE);
+                                        loginButton.setEnabled(true);
                                         Log.e(TAG, "Database error: " + databaseError.getMessage());
                                         Toast.makeText(LoginActivity.this,
                                                 "Error accessing database. Please try again.",
@@ -487,8 +382,8 @@ public class LoginActivity extends AppCompatActivity {
                                     }
                                 });
                             } else {
-                                showLoading(false);
-                                setLoginEnabled(true);
+                                progressBar.setVisibility(View.GONE);
+                                loginButton.setEnabled(true);
                                 String errorMessage = signInTask.getException() instanceof FirebaseAuthException ?
                                         "Invalid email or password" :
                                         "Login failed. Please try again.";
@@ -496,8 +391,8 @@ public class LoginActivity extends AppCompatActivity {
                                 Log.e(TAG, "Login error: " + signInTask.getException().getMessage());
                             }
                         } catch (Exception e) {
-                            showLoading(false);
-                            setLoginEnabled(true);
+                            progressBar.setVisibility(View.GONE);
+                            loginButton.setEnabled(true);
                             Log.e(TAG, "Error during login: " + e.getMessage(), e);
                             Toast.makeText(LoginActivity.this,
                                     "Error during login. Please try again.",
@@ -505,8 +400,8 @@ public class LoginActivity extends AppCompatActivity {
                         }
                     });
                 } else {
-                    showLoading(false);
-                    setLoginEnabled(true);
+                    progressBar.setVisibility(View.GONE);
+                    loginButton.setEnabled(true);
                     Log.e(TAG, "Error creating demo account: " + task.getException().getMessage());
                     Toast.makeText(LoginActivity.this,
                             "Error creating demo account. Please try again.",
@@ -514,8 +409,8 @@ public class LoginActivity extends AppCompatActivity {
                 }
             });
         } catch (Exception e) {
-            showLoading(false);
-            setLoginEnabled(true);
+            progressBar.setVisibility(View.GONE);
+            loginButton.setEnabled(true);
             Log.e(TAG, "Error in handleQuickLogin: " + e.getMessage(), e);
             Toast.makeText(this, "Error processing quick login. Please try again.", Toast.LENGTH_LONG).show();
         }
@@ -545,20 +440,34 @@ public class LoginActivity extends AppCompatActivity {
                         });
                     })
                     .addOnFailureListener(e -> {
-                        showLoading(false);
-                        setLoginEnabled(true);
+                        progressBar.setVisibility(View.GONE);
+                        loginButton.setEnabled(true);
                         Log.e(TAG, "Error creating demo user data: " + e.getMessage());
                         Toast.makeText(LoginActivity.this,
                                 "Error creating demo user data. Please try again.",
                                 Toast.LENGTH_LONG).show();
                     });
         } catch (Exception e) {
-            showLoading(false);
-            setLoginEnabled(true);
+            progressBar.setVisibility(View.GONE);
+            loginButton.setEnabled(true);
             Log.e(TAG, "Error in createDemoUserData: " + e.getMessage(), e);
             Toast.makeText(LoginActivity.this,
                     "Error creating demo user data. Please try again.",
                     Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void saveUserCredentials(String email, String password) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(KEY_USER_EMAIL, email);
+        editor.putString(KEY_USER_PASSWORD, password);
+        editor.apply();
+    }
+
+    private void clearUserCredentials() {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.remove(KEY_USER_EMAIL);
+        editor.remove(KEY_USER_PASSWORD);
+        editor.apply();
     }
 } 

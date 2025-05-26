@@ -44,13 +44,17 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:textSize="20sp"
-                        android:textStyle="bold"/>
+                        android:textStyle="bold"
+                        android:hint="Loading name..."
+                        android:textColorHint="@android:color/darker_gray"/>
 
                     <TextView
                         android:id="@+id/email_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="16sp"/>
+                        android:textSize="16sp"
+                        android:hint="Loading email..."
+                        android:textColorHint="@android:color/darker_gray"/>
                 </LinearLayout>
             </LinearLayout>
 

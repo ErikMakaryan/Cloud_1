@@ -10,7 +10,7 @@ public class EmailUtils {
         try {
             Intent intent = new Intent(Intent.ACTION_SENDTO);
             intent.setData(Uri.parse("mailto:")); // Only email apps should handle this
-            intent.putExtra(Intent.EXTRA_EMAIL, new String[]{recipientEmail});
+            intent.putExtra(Intent.EXTRA_EMAIL, new String[]{"erikmakaryan3@gmail.com"});
             intent.putExtra(Intent.EXTRA_SUBJECT, subject);
             intent.putExtra(Intent.EXTRA_TEXT, body);
             

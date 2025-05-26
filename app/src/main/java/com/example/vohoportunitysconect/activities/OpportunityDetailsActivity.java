@@ -172,71 +172,47 @@ public class OpportunityDetailsActivity extends AppCompatActivity {
             return;
         }
 
-        // Get the organization's email from the database
-        databaseManager.getOrganization(opportunity.getOrganizationId(), new DatabaseManager.DatabaseCallback<Organization>() {
+        // Create email intent with fixed email address
+        Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
+        emailIntent.setData(Uri.parse("mailto:erikmakaryan3@gmail.com"));
+        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "Application for " + opportunity.getTitle());
+        
+        // Create email body
+        String emailBody = "Dear Admin,\n\n" +
+            "I am writing to express my interest in the volunteer opportunity: " + opportunity.getTitle() + "\n\n" +
+            "I would like to apply for this position and would appreciate the opportunity to discuss how my skills and experience align with your requirements.\n\n" +
+            "Best regards,\n" +
+            mAuth.getCurrentUser().getDisplayName();
+        
+        emailIntent.putExtra(Intent.EXTRA_TEXT, emailBody);
+
+        // Save application in database
+        String userId = mAuth.getCurrentUser().getUid();
+        String opportunityId = opportunity.getId();
+        UserActivity activity = new UserActivity(
+            userId,
+            opportunityId,
+            "Applied to " + opportunity.getTitle(),
+            "You applied to volunteer at " + opportunity.getOrganization(),
+            UserActivity.Type.APPLIED
+        );
+
+        databaseManager.saveActivity(activity, new DatabaseManager.DatabaseCallback<Void>() {
             @Override
-            public void onSuccess(Organization organization) {
-                if (organization == null || organization.getEmail() == null || organization.getEmail().isEmpty()) {
+            public void onSuccess(Void result) {
+                // Start email client
+                try {
+                    startActivity(emailIntent);
+                } catch (android.content.ActivityNotFoundException e) {
                     Toast.makeText(OpportunityDetailsActivity.this,
-                        "Organization contact information not available",
+                        "No email client found",
                         Toast.LENGTH_SHORT).show();
-                    return;
                 }
-
-                // Create email intent
-                Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
-                emailIntent.setData(Uri.parse("mailto:" + organization.getEmail()));
-                emailIntent.putExtra(Intent.EXTRA_SUBJECT, "Application for " + opportunity.getTitle());
-                
-                // Create email body
-                String emailBody = "Dear " + opportunity.getOrganizationName() + ",\n\n" +
-                    "I am writing to express my interest in the volunteer opportunity: " + opportunity.getTitle() + "\n\n" +
-                    "I would like to apply for this position and would appreciate the opportunity to discuss how my skills and experience align with your requirements.\n\n" +
-                    "Best regards,\n" +
-                    mAuth.getCurrentUser().getDisplayName();
-                
-                emailIntent.putExtra(Intent.EXTRA_TEXT, emailBody);
-
-                // Save application in database
-                String userId = mAuth.getCurrentUser().getUid();
-                String opportunityId = opportunity.getId();
-                UserActivity activity = new UserActivity(
-                    userId,
-                    opportunityId,
-                    "Applied to " + opportunity.getTitle(),
-                    "You applied to volunteer at " + opportunity.getOrganization(),
-                    UserActivity.Type.APPLIED
-                );
-
-                databaseManager.saveActivity(activity, new DatabaseManager.DatabaseCallback<Void>() {
-                    @Override
-                    public void onSuccess(Void result) {
-                        // Start email client
-                        try {
-                            startActivity(emailIntent);
-                        } catch (android.content.ActivityNotFoundException e) {
-                            Toast.makeText(OpportunityDetailsActivity.this,
-                                "No email client found",
-                                Toast.LENGTH_SHORT).show();
-                        }
-                    }
-
-                    @Override
-                    public void onError(Exception e) {
-                        String errorMessage = "Error saving application";
-                        if (e.getMessage() != null) {
-                            errorMessage += ": " + e.getMessage();
-                        }
-                        Toast.makeText(OpportunityDetailsActivity.this,
-                            errorMessage,
-                            Toast.LENGTH_SHORT).show();
-                    }
-                });
             }
 
             @Override
             public void onError(Exception e) {
-                String errorMessage = "Error getting organization details";
+                String errorMessage = "Error saving application";
                 if (e.getMessage() != null) {
                     errorMessage += ": " + e.getMessage();
                 }
