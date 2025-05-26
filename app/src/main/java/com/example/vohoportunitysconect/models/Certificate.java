@@ -11,17 +11,19 @@ public class Certificate {
     private String fileUrl;
     private String filePath;
     private long uploadDate;
+    private String userId;
 
     // Default constructor for Firebase
     public Certificate() {
     }
 
     // Constructor for creating new certificates
-    public Certificate(String id, String name, String fileUrl, long uploadDate) {
+    public Certificate(String id, String name, String fileUrl, long uploadDate, String userId) {
         this.id = id;
         this.name = name;
         this.fileUrl = fileUrl;
         this.uploadDate = uploadDate;
+        this.userId = userId;
     }
 
     @Exclude
@@ -64,5 +66,13 @@ public class Certificate {
 
     public void setUploadDate(long uploadDate) {
         this.uploadDate = uploadDate;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 } 

@@ -3,18 +3,25 @@ package com.example.vohoportunitysconect.ui.profile;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.pdf.PdfRenderer;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -133,10 +140,7 @@ public class ProfileFragment extends Fragment {
         certificateAdapter = new CertificateAdapter(new ArrayList<>(), new CertificateAdapter.OnCertificateClickListener() {
             @Override
             public void onCertificateClick(Certificate certificate) {
-                // Open certificate details
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setData(Uri.parse(certificate.getFileUrl()));
-                startActivity(intent);
+                showCertificatePreview(certificate);
             }
 
             @Override
@@ -465,7 +469,7 @@ public class ProfileFragment extends Fragment {
             // Show loading dialog
             MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
             View dialogView = getLayoutInflater().inflate(R.layout.dialog_loading, null);
-            TextView messageText = dialogView.findViewById(R.id.message_text);
+            TextView messageText = dialogView.findViewById(R.id.loading_message);
             messageText.setText("Uploading certificate...");
             builder.setView(dialogView);
             builder.setCancelable(false);
@@ -719,6 +723,83 @@ public class ProfileFragment extends Fragment {
             .addOnFailureListener(e -> {
                 Toast.makeText(getContext(), "Failed to delete certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             });
+    }
+
+    private void showCertificatePreview(Certificate certificate) {
+        // Show loading dialog
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_loading, null);
+        TextView messageText = dialogView.findViewById(R.id.loading_message);
+        messageText.setText("Loading certificate...");
+        builder.setView(dialogView);
+        builder.setCancelable(false);
+        androidx.appcompat.app.AlertDialog loadingDialog = builder.create();
+        loadingDialog.show();
+
+        try {
+            // Get the file from the stored path
+            File certificateFile = new File(certificate.getFilePath());
+            if (certificateFile.exists()) {
+                loadingDialog.dismiss();
+                showPreviewDialog(certificateFile);
+            } else {
+                // If file doesn't exist locally, try to download it
+                StorageReference storageRef = FirebaseStorage.getInstance().getReferenceFromUrl(certificate.getFileUrl());
+                File tempFile = File.createTempFile("certificate", ".pdf", requireContext().getCacheDir());
+                
+                storageRef.getFile(tempFile)
+                    .addOnSuccessListener(taskSnapshot -> {
+                        loadingDialog.dismiss();
+                        showPreviewDialog(tempFile);
+                    })
+                    .addOnFailureListener(e -> {
+                        loadingDialog.dismiss();
+                        Toast.makeText(getContext(), "Error loading certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
+            }
+        } catch (IOException e) {
+            loadingDialog.dismiss();
+            Toast.makeText(getContext(), "Error preparing certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showPreviewDialog(File pdfFile) {
+        Dialog previewDialog = new Dialog(requireContext());
+        previewDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        previewDialog.setContentView(R.layout.dialog_certificate_preview);
+        
+        ImageView previewImage = previewDialog.findViewById(R.id.preview_image);
+        
+        try {
+            ParcelFileDescriptor fileDescriptor = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
+            PdfRenderer pdfRenderer = new PdfRenderer(fileDescriptor);
+            
+            // Render first page
+            PdfRenderer.Page page = pdfRenderer.openPage(0);
+            Bitmap bitmap = Bitmap.createBitmap(page.getWidth() * 2, page.getHeight() * 2, Bitmap.Config.ARGB_8888);
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+            
+            previewImage.setImageBitmap(bitmap);
+            
+            page.close();
+            pdfRenderer.close();
+            fileDescriptor.close();
+            
+            // Set dialog size
+            Window window = previewDialog.getWindow();
+            if (window != null) {
+                WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
+                layoutParams.copyFrom(window.getAttributes());
+                layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT;
+                layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
+                window.setAttributes(layoutParams);
+            }
+            
+            previewDialog.show();
+            
+        } catch (IOException e) {
+            Toast.makeText(getContext(), "Error showing preview: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override

@@ -3,7 +3,15 @@ package com.example.vohoportunitysconect.activities;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
-import android.app.ProgressDialog;
+import android.graphics.Bitmap;
+import android.graphics.pdf.PdfRenderer;
+import android.os.ParcelFileDescriptor;
+import android.widget.ImageView;
+import android.app.Dialog;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -12,6 +20,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.vohoportunitysconect.R;
 import com.example.vohoportunitysconect.adapters.CertificateAdapter;
 import com.example.vohoportunitysconect.models.Certificate;
+import com.example.vohoportunitysconect.database.CertificateDatabase;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -34,7 +43,8 @@ public class CertificatesActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private DatabaseReference dbRef;
     private FirebaseStorage storage;
-    private ProgressDialog progressDialog;
+    private Dialog loadingDialog;
+    private CertificateDatabase certificateDatabase;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,10 +56,18 @@ public class CertificatesActivity extends AppCompatActivity {
         dbRef = FirebaseDatabase.getInstance().getReference();
         storage = FirebaseStorage.getInstance();
 
-        // Initialize progress dialog
-        progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Loading certificate...");
-        progressDialog.setCancelable(false);
+        // Initialize local database
+        certificateDatabase = new CertificateDatabase(this);
+
+        // Initialize loading dialog
+        loadingDialog = new Dialog(this);
+        loadingDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        loadingDialog.setContentView(R.layout.dialog_loading);
+        loadingDialog.setCancelable(false);
+        Window window = loadingDialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+        }
 
         // Initialize views
         certificatesRecyclerView = findViewById(R.id.certificates_recycler_view);
@@ -59,7 +77,7 @@ public class CertificatesActivity extends AppCompatActivity {
         certificateAdapter = new CertificateAdapter(new ArrayList<>(), new CertificateAdapter.OnCertificateClickListener() {
             @Override
             public void onCertificateClick(Certificate certificate) {
-                showCertificateDetailsDialog(certificate);
+                showCertificatePreview(certificate);
             }
 
             @Override
@@ -71,6 +89,20 @@ public class CertificatesActivity extends AppCompatActivity {
 
         // Load certificates
         loadCertificates();
+    }
+
+    private void showLoadingDialog(String message) {
+        TextView messageText = loadingDialog.findViewById(R.id.loading_message);
+        if (messageText != null) {
+            messageText.setText(message);
+        }
+        loadingDialog.show();
+    }
+
+    private void hideLoadingDialog() {
+        if (loadingDialog != null && loadingDialog.isShowing()) {
+            loadingDialog.dismiss();
+        }
     }
 
     private void loadCertificates() {
@@ -87,6 +119,8 @@ public class CertificatesActivity extends AppCompatActivity {
                     Certificate certificate = snapshot.getValue(Certificate.class);
                     if (certificate != null) {
                         certificate.setId(snapshot.getKey());
+                        // Save to local database
+                        certificateDatabase.saveCertificate(certificate);
                         certificates.add(certificate);
                     }
                 }
@@ -106,24 +140,8 @@ public class CertificatesActivity extends AppCompatActivity {
         });
     }
 
-    private void showCertificateDetailsDialog(Certificate certificate) {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(certificate.getName())
-            .setMessage(
-                "Certificate Name: " + certificate.getName() + "\n\n" +
-                "Upload Date: " + new java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
-                    .format(new java.util.Date(certificate.getUploadDate()))
-            )
-            .setPositiveButton("View", (dialog, which) -> {
-                downloadAndOpenCertificate(certificate);
-            })
-            .setNeutralButton("Share", (dialog, which) -> shareCertificate(certificate))
-            .setNegativeButton("Close", null)
-            .show();
-    }
-
-    private void downloadAndOpenCertificate(Certificate certificate) {
-        progressDialog.show();
+    private void showCertificatePreview(Certificate certificate) {
+        showLoadingDialog("Loading certificate...");
 
         try {
             // Get the file reference from Firebase Storage
@@ -135,44 +153,56 @@ public class CertificatesActivity extends AppCompatActivity {
             // Download the file
             storageRef.getFile(localFile)
                 .addOnSuccessListener(taskSnapshot -> {
-                    progressDialog.dismiss();
-                    try {
-                        // Create a PDF viewer intent
-                        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
-                        intent.setDataAndType(android.net.Uri.fromFile(localFile), "application/pdf");
-                        intent.setFlags(android.content.Intent.FLAG_ACTIVITY_NO_HISTORY);
-                        
-                        // Check if there's an app that can handle PDFs
-                        if (intent.resolveActivity(getPackageManager()) != null) {
-                            startActivity(intent);
-                        } else {
-                            Toast.makeText(this, "No app found to view PDF files", Toast.LENGTH_SHORT).show();
-                        }
-                    } catch (Exception e) {
-                        Toast.makeText(this, "Error opening certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
+                    hideLoadingDialog();
+                    showPreviewDialog(localFile);
                 })
                 .addOnFailureListener(e -> {
-                    progressDialog.dismiss();
+                    hideLoadingDialog();
                     Toast.makeText(this, "Error downloading certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
         } catch (IOException e) {
-            progressDialog.dismiss();
+            hideLoadingDialog();
             Toast.makeText(this, "Error preparing certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void shareCertificate(Certificate certificate) {
-        android.content.Intent shareIntent = new android.content.Intent();
-        shareIntent.setAction(android.content.Intent.ACTION_SEND);
-        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT,
-            "I received a certificate!\n\n" +
-            "Certificate Name: " + certificate.getName() + "\n" +
-            "Upload Date: " + new java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
-                .format(new java.util.Date(certificate.getUploadDate()))
-        );
-        shareIntent.setType("text/plain");
-        startActivity(android.content.Intent.createChooser(shareIntent, "Share Certificate"));
+    private void showPreviewDialog(File pdfFile) {
+        Dialog previewDialog = new Dialog(this);
+        previewDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        previewDialog.setContentView(R.layout.dialog_certificate_preview);
+        
+        ImageView previewImage = previewDialog.findViewById(R.id.preview_image);
+        
+        try {
+            ParcelFileDescriptor fileDescriptor = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
+            PdfRenderer pdfRenderer = new PdfRenderer(fileDescriptor);
+            
+            // Render first page
+            PdfRenderer.Page page = pdfRenderer.openPage(0);
+            Bitmap bitmap = Bitmap.createBitmap(page.getWidth() * 2, page.getHeight() * 2, Bitmap.Config.ARGB_8888);
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+            
+            previewImage.setImageBitmap(bitmap);
+            
+            page.close();
+            pdfRenderer.close();
+            fileDescriptor.close();
+            
+            // Set dialog size
+            Window window = previewDialog.getWindow();
+            if (window != null) {
+                WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
+                layoutParams.copyFrom(window.getAttributes());
+                layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT;
+                layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
+                window.setAttributes(layoutParams);
+            }
+            
+            previewDialog.show();
+            
+        } catch (IOException e) {
+            Toast.makeText(this, "Error showing preview: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showDeleteConfirmationDialog(Certificate certificate) {
@@ -190,10 +220,21 @@ public class CertificatesActivity extends AppCompatActivity {
             .child(certificate.getId())
             .removeValue()
             .addOnSuccessListener(aVoid -> {
+                // Also delete from local database
+                certificateDatabase.deleteCertificate(certificate.getId());
                 Toast.makeText(this, "Certificate deleted successfully", Toast.LENGTH_SHORT).show();
             })
             .addOnFailureListener(e -> {
                 Toast.makeText(this, "Failed to delete certificate: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (certificateDatabase != null) {
+            certificateDatabase.close();
+        }
+        hideLoadingDialog();
     }
 } 

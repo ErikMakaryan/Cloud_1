@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center">
+    android:gravity="center"
+    android:padding="16dp"
+    android:background="@drawable/loading_dialog_background">
 
     <ProgressBar
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_marginBottom="16dp"/>
+        android:indeterminate="true" />
 
     <TextView
-        android:id="@+id/message_text"
+        android:id="@+id/loading_message"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:gravity="center"/>
+        android:layout_marginTop="8dp"
+        android:text="Loading..."
+        android:textColor="@android:color/white"
+        android:textSize="16sp" />
 
 </LinearLayout> 
