@@ -96,15 +96,14 @@ public class LoginActivity extends AppCompatActivity {
             setupClickListeners();
 
             // Check if user credentials are saved
-            String savedEmail = sharedPreferences.getString(KEY_USER_EMAIL, null);
-            String savedPassword = sharedPreferences.getString(KEY_USER_PASSWORD, null);
+            // String savedEmail = sharedPreferences.getString(KEY_USER_EMAIL, null);
+            // String savedPassword = sharedPreferences.getString(KEY_USER_PASSWORD, null);
 
-            if (savedEmail != null && savedPassword != null) {
-                // Auto login with saved credentials
-                emailInput.setText(savedEmail);
-                passwordInput.setText(savedPassword);
-                handleLogin();
-            }
+            // if (savedEmail != null && savedPassword != null) {
+            //     emailInput.setText(savedEmail);
+            //     passwordInput.setText(savedPassword);
+            //     handleLogin();
+            // }
 
         } catch (Exception e) {
             Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);

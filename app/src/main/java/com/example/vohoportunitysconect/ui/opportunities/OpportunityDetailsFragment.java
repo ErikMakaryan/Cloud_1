@@ -253,8 +253,6 @@ public class OpportunityDetailsFragment extends Fragment {
 
     private void setupSavedState(Opportunity opportunity) {
         if (mAuth.getCurrentUser() == null) {
-            binding.saveFab.setImageResource(R.drawable.ic_bookmark_border);
-            binding.saveFab.clearColorFilter();
             return;
         }
 
@@ -264,11 +262,8 @@ public class OpportunityDetailsFragment extends Fragment {
             .get()
             .addOnSuccessListener(snapshot -> {
                 boolean isSaved = snapshot.exists();
-                binding.saveFab.setImageResource(isSaved ? R.drawable.ic_bookmark_filled : R.drawable.ic_bookmark_border);
                 if (isSaved) {
-                    binding.saveFab.setColorFilter(getResources().getColor(R.color.orange, null));
                 } else {
-                    binding.saveFab.clearColorFilter();
                 }
             });
     }
@@ -290,7 +285,6 @@ public class OpportunityDetailsFragment extends Fragment {
         // Clear references to prevent memory leaks
         if (binding != null) {
             binding.applyButton.setOnClickListener(null);
-            binding.saveFab.setOnClickListener(null);
             binding.backButton.setOnClickListener(null);
         }
         binding = null;
